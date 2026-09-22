@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/* ===== 魔物酒馆 · 全局基调（Phase 0 占位样式，正式素材接入后替换）===== */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #1a1410; /* 酒馆深木色 */
+  color: #f0e6d2; /* 羊皮纸暖白 */
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ── 像素风组件（硬边框 + 硬阴影 + 无圆角）── */
+.pixel-panel {
+  border: 2px solid #5c4325;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  background: linear-gradient(180deg, #2b2118 0%, #241b13 100%);
+}
+
+.pixel-btn {
+  border: 2px solid #5c4325;
+  background: #3a2d1e;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
+  color: #f0e6d2;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 80ms,
+    box-shadow 80ms,
+    background 120ms;
+}
+
+.pixel-btn:hover:not(:disabled) {
+  background: #4a3a26;
+}
+
+.pixel-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+.pixel-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.pixel-btn-primary {
+  background: #d9a441;
+  border-color: #8a6a2a;
+  color: #1a1410;
+}
+
+.pixel-btn-primary:hover:not(:disabled) {
+  background: #e8b455;
+}
+
+.pixel-btn-danger {
+  background: #7a2d22;
+  border-color: #5c1f16;
+  color: #f0d5cf;
+}
+
+.pixel-btn-danger:hover:not(:disabled) {
+  background: #8f372a;
+}
+
+/* ── 动效 ── */
+/* 战斗中状态脉冲 */
+@keyframes combat-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.combat-pulse {
+  animation: combat-pulse 1s ease-in-out infinite;
+}
+
+/* 烹饪锅冒泡 */
+@keyframes bubble {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.cooking-bub {
+  display: inline-block;
+  animation: bubble 0.8s ease-in-out infinite;
+}
