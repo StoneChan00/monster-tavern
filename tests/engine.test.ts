@@ -118,12 +118,16 @@ describe('存档迁移 v1 → v2', () => {
     expect(loaded!.player.reputation).toBe(5);
   });
 
-  it('serialize → deserialize 往返一致（v2）', () => {
+  it('serialize → deserialize 往返一致（v2，瞬态事件剥离）', () => {
     const s = freshState();
     tickN(s, 60, 5);
-    const round = deserialize(serialize(s));
+    expect(s.events.length).toBeGreaterThan(0);
+    const raw = serialize(s);
+    expect(JSON.parse(raw).state.events).toBeUndefined(); // 事件不进存档
+    const round = deserialize(raw);
     expect(round).not.toBeNull();
-    expect(round).toEqual(s);
+    expect(round!.events).toEqual([]);
+    expect({ ...round, events: s.events }).toEqual(s);
   });
 
   it('非法存档被拒绝', () => {
@@ -462,6 +466,65 @@ describe('替补席与休整', () => {
     spawnWave(s);
     tickN(s, 1, 111);
     expect(s.dungeon.restRemainingS).toBe(Math.ceil(BALANCE.REST_AFTER_WIPE_S * 0.5));
+  });
+});
+
+describe('战斗事件流', () => {
+  it('开局即有 waveStart；战斗产生双方 hit 与击杀/清波事件', () => {
+    const s = freshState();
+    const start = s.events.find((e) => e.kind === 'waveStart');
+    expect(start).toBeDefined();
+    expect(start).toMatchObject({ kind: 'waveStart', wave: 1, waveCount: 5, isBoss: false });
+
+    tickN(s, 60, 21);
+    const hits = s.events.filter((e) => e.kind === 'hit');
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.some((e) => e.attackerSide === 'party')).toBe(true);
+    expect(hits.some((e) => e.attackerSide === 'monster')).toBe(true);
+    expect(s.events.some((e) => e.kind === 'death' && e.side === 'monster')).toBe(true);
+    expect(s.events.some((e) => e.kind === 'waveClear')).toBe(true);
+    // 升级事件
+    expect(s.events.some((e) => e.kind === 'levelup')).toBe(true);
+  });
+
+  it('hit 事件载荷：伤害数值与目标标识', () => {
+    const s = freshState();
+    tickN(s, 3, 33);
+    const hit = s.events.find((e) => e.kind === 'hit' && e.attackerSide === 'party');
+    expect(hit).toBeDefined();
+    if (hit && hit.kind === 'hit' && hit.attackerSide === 'party') {
+      expect(hit.attackerId).toBe('adv_hank');
+      expect(hit.damage).toBeGreaterThan(0);
+      expect(hit.targetMonsterId).toBe('slime');
+      expect(typeof hit.crit).toBe('boolean');
+    }
+  });
+
+  it('牧师治疗 / 团灭 / 复活事件', () => {
+    const s = freshState();
+    const warrior = makeAdventurer('w1', 'warrior', 5);
+    const priest = makeAdventurer('p1', 'priest', 10);
+    setupParty(s, [warrior, priest]);
+    warrior.hp = Math.floor(getAdventurerStats(s, warrior).hp * 0.3);
+    tickN(s, 1, 31);
+    expect(s.events.some((e) => e.kind === 'heal')).toBe(true);
+
+    const s2 = freshState();
+    s2.roster[0].hp = 1;
+    s2.dungeon.waveIndex = 4;
+    spawnWave(s2);
+    tickN(s2, 1, 111);
+    expect(s2.dungeon.status).toBe('resting');
+    expect(s2.events.some((e) => e.kind === 'wipe')).toBe(true);
+    tickN(s2, BALANCE.REST_AFTER_WIPE_S, 111);
+    expect(s2.events.some((e) => e.kind === 'revive')).toBe(true);
+  });
+
+  it('事件环缓冲不超上限（长离线也不爆）', () => {
+    const s = freshState();
+    applyOffline(s, 3 * 3600, { rng: mulberry32(9) });
+    expect(s.events.length).toBeLessThanOrEqual(BALANCE.EVENT_LIMIT);
+    expect(s.events.length).toBeGreaterThan(0);
   });
 });
 
