@@ -32,6 +32,7 @@ interface GameStore {
   cook: (recipeId: RecipeId) => ActionResult;
   upgradeFacility: (facilityId: FacilityId) => ActionResult;
   signVisitor: (uid: number) => ActionResult;
+  dismissAdventurer: (adventurerId: string) => ActionResult;
   assignToSlot: (slot: number, adventurerId: string | null) => ActionResult;
   setFarmFloor: (floor: number) => ActionResult;
   dismissOfflineReport: () => void;
@@ -234,6 +235,19 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     );
     set({ state: { ...s } });
     return { ok: true, message: '签约成功' };
+  },
+
+  dismissAdventurer: (adventurerId) => {
+    const s = get().state;
+    const adv = s.roster.find((a) => a.id === adventurerId);
+    if (!adv) return { ok: false, message: '冒险者不存在' };
+    // 编队中则先自动下场
+    const slot = s.party.indexOf(adventurerId);
+    if (slot >= 0) s.party[slot] = null;
+    s.roster = s.roster.filter((a) => a.id !== adventurerId);
+    pushLog(s, 'system', `👋 ${adv.name} 结清了工钱，与酒馆道别离开。愿风指引他的旅途。`);
+    set({ state: { ...s } });
+    return { ok: true, message: '已解雇' };
   },
 
   assignToSlot: (slot, adventurerId) => {

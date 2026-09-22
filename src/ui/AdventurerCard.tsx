@@ -91,6 +91,18 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
             日薪 💰{wage}/天
           </div>
         </div>
+
+        <button
+          type="button"
+          className="pixel-btn pixel-btn-danger w-full"
+          onClick={() => {
+            if (window.confirm(`确定解雇 ${adv.name} 吗？此操作不可恢复。`)) {
+              useGameStore.getState().dismissAdventurer(adv.id);
+            }
+          }}
+        >
+          解雇
+        </button>
       </div>
     </Panel>
   );
