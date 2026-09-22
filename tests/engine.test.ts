@@ -10,8 +10,10 @@ import { mulberry32 } from '../src/engine/rng';
 import { serialize, deserialize } from '../src/save/migrate';
 import { useGameStore } from '../src/store/gameStore';
 import { BALANCE, rosterCap } from '../src/data/balance';
-import { MONSTERS } from '../src/data/monsters';
+import { FLOOR_DEFS, MONSTERS } from '../src/data/monsters';
 import { RECIPES } from '../src/data/recipes';
+import { MATERIALS } from '../src/data/materials';
+import { RACES } from '../src/data/races';
 import { fmtNum } from '../src/utils/format';
 import { SAVE_VERSION } from '../src/engine/types';
 import type { AdventurerState, GameState, OfflineReport } from '../src/engine/types';
@@ -21,8 +23,8 @@ function freshState(): GameState {
   return createInitialState(1_700_000_000_000);
 }
 
-function makeAdventurer(id: string, classId: string, level = 5): AdventurerState {
-  return { id, name: id, classId, rarity: 'common', level, exp: 0, hp: 1, loyalty: 50 };
+function makeAdventurer(id: string, classId: string, level = 5, race = 'human'): AdventurerState {
+  return { id, name: id, classId, race, rarity: 'common', level, exp: 0, hp: 1, loyalty: 50 };
 }
 
 /** 重设编队（槽位 0/1/2），并按满血初始化 */
@@ -70,8 +72,8 @@ describe('初始状态 v2', () => {
   });
 });
 
-describe('存档迁移 v1 → v2', () => {
-  it('Phase 0 存档完整升级：进度保留、新字段就位', () => {
+describe('存档迁移链（v1 → v3）', () => {
+  it('Phase 0 存档完整升级：进度保留、种族补齐', () => {
     const v1 = {
       version: 1,
       meta: {
@@ -104,9 +106,10 @@ describe('存档迁移 v1 → v2', () => {
     const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 1, state: v1, exportedAt: 1 });
     const loaded = deserialize(raw);
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(2);
+    expect(loaded!.version).toBe(3);
     expect(loaded!.roster[0].name).toBe('铁胃汉克');
     expect(loaded!.roster[0].level).toBe(4);
+    expect(loaded!.roster[0].race).toBe('human'); // v3 补种族
     expect(loaded!.party[0]).toBe('adv_hank');
     expect(loaded!.tavern.trainingGround).toBe(2);
     expect(loaded!.tavern.lounge).toBe(0);
@@ -116,6 +119,22 @@ describe('存档迁移 v1 → v2', () => {
     expect(loaded!.kitchen.unlockedRecipes).toContain('recipe_bat_wings'); // 新初始菜谱补发
     expect(loaded!.inventory['mat_gel']).toBe(7);
     expect(loaded!.player.reputation).toBe(5);
+  });
+
+  it('v2 存档（Phase 1）升级 v3：全员补 human 种族', () => {
+    const s = freshState();
+    const v2Like = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & {
+      roster: Array<Record<string, unknown>>;
+      recruitment: { visitors: Array<Record<string, unknown>> };
+    };
+    v2Like.version = 2;
+    for (const a of v2Like.roster) delete a.race;
+    for (const v of v2Like.recruitment.visitors) delete v.race;
+    const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 2, state: v2Like, exportedAt: 1 });
+    const loaded = deserialize(raw);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.version).toBe(3);
+    expect(loaded!.roster[0].race).toBe('human');
   });
 
   it('serialize → deserialize 往返一致（v2，瞬态事件剥离）', () => {
@@ -434,10 +453,71 @@ describe('掉落', () => {
     const s = freshState();
     setupParty(s, [makeAdventurer('w1', 'warrior', 15)]);
     tickN(s, 500, 7);
+    const valid = new Set(Object.keys(MATERIALS));
     for (const k of Object.keys(s.inventory)) {
-      expect(['mat_gel', 'mat_carapace', 'mat_bat_wing']).toContain(k);
+      expect(valid.has(k)).toBe(true);
     }
     expect(s.log.length).toBeLessThanOrEqual(BALANCE.LOG_LIMIT);
+  });
+});
+
+describe('迷宫饭式数据完整性', () => {
+  it('所有魔物掉落与菜谱材料均有效', () => {
+    const matIds = new Set(Object.keys(MATERIALS));
+    for (const m of Object.values(MONSTERS)) {
+      expect(m.drops.length).toBeGreaterThan(0);
+      for (const d of m.drops) {
+        expect(matIds.has(d.materialId)).toBe(true);
+      }
+    }
+    for (const r of Object.values(RECIPES)) {
+      expect(Object.keys(r.cost.materials).length).toBeGreaterThanOrEqual(1);
+      for (const mid of Object.keys(r.cost.materials)) {
+        expect(matIds.has(mid)).toBe(true);
+      }
+    }
+  });
+
+  it('20 层楼层链完整：每层 5 波、末波 BOSS、魔物已注册、强度递增', () => {
+    expect(FLOOR_DEFS).toHaveLength(20);
+    let prevBossHp = 0;
+    for (const f of FLOOR_DEFS) {
+      expect(f.waves).toHaveLength(5);
+      expect(f.waves[4]!.isBoss).toBe(true);
+      for (const w of f.waves) {
+        for (const mid of w.monsters) {
+          expect(MONSTERS[mid]).toBeDefined();
+        }
+      }
+      const bossId = f.waves[4]!.monsters[0]!;
+      const bossHp = MONSTERS[bossId]!.base.hp;
+      expect(bossHp).toBeGreaterThan(prevBossHp);
+      prevBossHp = bossHp;
+    }
+    // 顶层食材可获取（虚空精华来自 16+ 层魔物）
+    expect(MONSTERS.void_wraith!.drops.some((d) => d.materialId === 'mat_void_essence')).toBe(true);
+  });
+
+  it('种族属性修正：精灵快于人类，矮人更硬', () => {
+    const s = freshState();
+    const human = makeAdventurer('h', 'warrior', 5, 'human');
+    const elf = makeAdventurer('e', 'warrior', 5, 'elf');
+    const dwarf = makeAdventurer('d', 'warrior', 5, 'dwarf');
+    s.roster = [human, elf, dwarf];
+    s.party = [human.id, elf.id, dwarf.id, null, null];
+    expect(getAdventurerStats(s, elf).spd).toBeGreaterThan(getAdventurerStats(s, human).spd);
+    expect(getAdventurerStats(s, dwarf).def).toBeGreaterThan(getAdventurerStats(s, human).def);
+    expect(getAdventurerStats(s, dwarf).hp).toBeGreaterThan(getAdventurerStats(s, human).hp);
+  });
+
+  it('访客携带种族且在种族表内', () => {
+    const s = freshState();
+    const visitors = generateVisitors(s, mulberry32(5));
+    expect(visitors.length).toBeGreaterThan(0);
+    for (const v of visitors) {
+      expect(RACES[v.race]).toBeDefined();
+      expect(RACES[v.race]!.namePool).toContain(v.name);
+    }
   });
 });
 
