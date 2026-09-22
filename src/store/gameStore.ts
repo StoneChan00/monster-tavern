@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { BALANCE, kitchenSpeedMult, rosterCap } from '../data/balance';
 import { CLASSES } from '../data/classes';
+import { RACES } from '../data/races';
 import { RECIPES } from '../data/recipes';
 import { FACILITIES, type FacilityId } from '../data/upgrades';
 import { MATERIALS } from '../data/materials';
@@ -211,6 +212,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       id: `adv_${visitor.uid}`,
       name: visitor.name,
       classId: visitor.classId,
+      race: visitor.race,
       rarity: visitor.rarity,
       level: 1,
       exp: 0,
@@ -224,10 +226,11 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const slot = s.party.findIndex((id, i) => id === null && isSlotUnlocked(i, s.player.reputation));
     if (slot >= 0) s.party[slot] = adv.id;
 
+    const raceName = RACES[visitor.race]?.name ?? '人类';
     pushLog(
       s,
       'system',
-      `✍️ ${visitor.name}（${CLASSES[visitor.classId].name}·${RARITY_LABEL[visitor.rarity]}）签下契约！${slot >= 0 ? '已加入编队' : '在替补席待命'}`,
+      `✍️ ${visitor.name}（${raceName}·${CLASSES[visitor.classId].name}·${RARITY_LABEL[visitor.rarity]}）签下契约！${slot >= 0 ? '已加入编队' : '在替补席待命'}`,
     );
     set({ state: { ...s } });
     return { ok: true, message: '签约成功' };
