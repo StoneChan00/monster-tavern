@@ -5,7 +5,7 @@ import type { GameState, OfflineReport, TickOptions } from './types';
 interface Snapshot {
   gold: number;
   lifetimeExp: number;
-  level: number;
+  levelSum: number;
   inventory: Record<string, number>;
   wavesCleared: number;
   bossKills: number;
@@ -15,7 +15,7 @@ function snapshot(state: GameState): Snapshot {
   return {
     gold: state.player.gold,
     lifetimeExp: state.meta.lifetimeExpEarned,
-    level: state.adventurer.level,
+    levelSum: state.roster.reduce((s, a) => s + a.level, 0),
     inventory: { ...state.inventory },
     wavesCleared: state.meta.totalWavesCleared,
     bossKills: state.meta.totalBossKills,
@@ -28,7 +28,8 @@ export interface OfflineResult {
 }
 
 /**
- * 离线结算：与在线完全相同的 tick 路径，收益按 OFFLINE_EFFICIENCY 折算。
+ * 离线结算：与在线完全相同的 tick 路径（含到访/日薪/菜谱解锁），
+ * 收益按 OFFLINE_EFFICIENCY 折算。
  * awaySeconds < 0（时钟回拨）→ 不结算并标记 clockTampered。
  */
 export function applyOffline(state: GameState, awaySeconds: number, opts: TickOptions = {}): OfflineResult {
@@ -51,7 +52,7 @@ export function applyOffline(state: GameState, awaySeconds: number, opts: TickOp
     efficiency: BALANCE.OFFLINE_EFFICIENCY,
     gold: state.player.gold - before.gold,
     exp: state.meta.lifetimeExpEarned - before.lifetimeExp,
-    levelsGained: state.adventurer.level - before.level,
+    levelsGained: state.roster.reduce((s, a) => s + a.level, 0) - before.levelSum,
     materials,
     wavesCleared: state.meta.totalWavesCleared - before.wavesCleared,
     bossKills: state.meta.totalBossKills - before.bossKills,

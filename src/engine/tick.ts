@@ -1,9 +1,12 @@
-import { BALANCE } from '../data/balance';
+import { BALANCE, kitchenBuffSlots, kitchenSpeedMult } from '../data/balance';
 import { RECIPES } from '../data/recipes';
-import { FLOORS } from '../data/monsters';
+import { CLASSES } from '../data/classes';
+import { FLOORS, floorIdOf } from '../data/monsters';
 import { resolveRound, spawnWave } from './combat';
-import { getEffectiveStats } from './stats';
+import { getAdventurerStats, RARITY_INDEX } from './stats';
 import { pushLog } from './log';
+import { generateVisitors } from './recruitment';
+import { getPartyMembers } from './party';
 import type { GameState, TickOptions } from './types';
 
 /**
@@ -20,6 +23,9 @@ function tickOnce(state: GameState, opts: TickOptions): void {
   const rng = opts.rng ?? Math.random;
   const mult = opts.offline ? BALANCE.OFFLINE_EFFICIENCY : 1;
 
+  // 模拟时钟推进（招募到访 / 日薪结算都基于它）
+  state.meta.now += 1000;
+
   // ── 地牢 ─────────────────────────────
   const d = state.dungeon;
   switch (d.status) {
@@ -31,9 +37,11 @@ function tickOnce(state: GameState, opts: TickOptions): void {
       d.restRemainingS -= 1;
       if (d.restRemainingS <= 0) {
         if (d.status === 'resting') {
-          state.adventurer.hp = getEffectiveStats(state).hp;
+          for (const m of getPartyMembers(state)) {
+            m.adv.hp = getAdventurerStats(state, m.adv).hp;
+          }
           d.waveIndex = 0;
-          pushLog(state, 'system', `🛏️ 休整完毕，${state.adventurer.name} 满血重返地牢！`);
+          pushLog(state, 'system', '🛏️ 休整完毕，队伍满血重返地牢！');
         } else {
           d.waveIndex = (d.waveIndex + 1) % FLOORS[d.floorId].waves.length;
         }
@@ -43,10 +51,20 @@ function tickOnce(state: GameState, opts: TickOptions): void {
     }
   }
 
-  // ── 厨房 ─────────────────────────────
+  // ── 替补席休养：每 tick 回复 2% 最大生命 ──
+  const partyIds = new Set(state.party.filter((x): x is string => x !== null));
+  for (const adv of state.roster) {
+    if (partyIds.has(adv.id)) continue;
+    const maxHp = getAdventurerStats(state, adv).hp;
+    if (adv.hp < maxHp) {
+      adv.hp = Math.min(maxHp, adv.hp + Math.ceil(maxHp * 0.02));
+    }
+  }
+
+  // ── 厨房（烹饪速度受厨房等级加成） ──
   const job = state.kitchen.job;
   if (job) {
-    job.remainingS -= 1;
+    job.remainingS -= kitchenSpeedMult(state.tavern.kitchen);
     if (job.remainingS <= 0) completeCooking(state);
   }
 
@@ -57,13 +75,32 @@ function tickOnce(state: GameState, opts: TickOptions): void {
     if (expired.length > 0) {
       state.kitchen.buffs = state.kitchen.buffs.filter((b) => b.remainingS > 0);
       for (const e of expired) {
-        pushLog(state, 'kitchen', `${RECIPES[e.recipeId]?.icon ?? '🍽️'} 「${RECIPES[e.recipeId]?.name ?? '菜肴'}」的效果消散了`);
+        const r = RECIPES[e.recipeId];
+        pushLog(state, 'kitchen', `${r?.icon ?? '🍽️'} 「${r?.name ?? '菜肴'}」的效果消散了`);
       }
-      // buff 过期后当前 HP 可能超上限，钳制
-      const maxHp = getEffectiveStats(state).hp;
-      if (state.adventurer.hp > maxHp) state.adventurer.hp = maxHp;
+      // HP buff 过期后当前生命可能超上限，钳制
+      for (const m of getPartyMembers(state)) {
+        const maxHp = getAdventurerStats(state, m.adv).hp;
+        if (m.adv.hp > maxHp) m.adv.hp = maxHp;
+      }
     }
   }
+
+  // ── 招募到访（模拟时钟驱动，离线同样推进） ──
+  if (state.meta.now >= state.recruitment.nextVisitAt) {
+    state.recruitment.visitors = generateVisitors(state, rng);
+    state.recruitment.nextVisitAt = state.meta.now + BALANCE.VISIT_INTERVAL_S * 1000;
+    const names = state.recruitment.visitors
+      .map((v) => `${v.name}（${CLASSES[v.classId].name}）`)
+      .join('、');
+    pushLog(state, 'system', `🍻 新的冒险者到访酒馆：${names}`);
+  }
+
+  // ── 日薪结算（模拟日界） ─────────────
+  settleWagesIfDue(state);
+
+  // ── 菜谱解锁检查 ─────────────────────
+  checkRecipeUnlocks(state);
 }
 
 function completeCooking(state: GameState): void {
@@ -75,8 +112,16 @@ function completeCooking(state: GameState): void {
     return;
   }
   state.kitchen.job = null;
-  // 同菜谱效果刷新（不叠加）；不同属性 buff 可共存
+  // 同菜谱效果刷新（不叠加）
   state.kitchen.buffs = state.kitchen.buffs.filter((b) => b.recipeId !== recipe.id);
+  // 超出同时生效上限 → 淘汰最早的
+  while (state.kitchen.buffs.length >= kitchenBuffSlots(state.tavern.kitchen)) {
+    const removed = state.kitchen.buffs.shift();
+    if (removed) {
+      const r = RECIPES[removed.recipeId];
+      pushLog(state, 'kitchen', `🍽️ 「${r?.name ?? '菜肴'}」的效果被替换下架`);
+    }
+  }
   state.kitchen.buffs.push({
     recipeId: recipe.id,
     label: recipe.buff.label,
@@ -85,10 +130,74 @@ function completeCooking(state: GameState): void {
     remainingS: recipe.buff.durationS,
     totalS: recipe.buff.durationS,
   });
-  state.adventurer.loyalty = Math.min(100, state.adventurer.loyalty + recipe.mealLoyalty);
+  // 开饭：全酒馆冒险者用餐（忠诚度提升）
+  for (const a of state.roster) {
+    a.loyalty = Math.min(100, a.loyalty + recipe.mealLoyalty);
+  }
   pushLog(
     state,
     'kitchen',
-    `${recipe.icon} 「${recipe.name}」出锅！${state.adventurer.name} 大快朵颐（${recipe.buff.label}，持续 ${Math.round(recipe.buff.durationS / 60)} 分钟）`,
+    `${recipe.icon} 「${recipe.name}」出锅！众人（${state.roster.length} 人）大快朵颐（${recipe.buff.label}，持续 ${Math.round(recipe.buff.durationS / 60)} 分钟）`,
   );
+}
+
+function settleWagesIfDue(state: GameState): void {
+  const day = Math.floor(state.meta.now / BALANCE.DAY_MS);
+  if (day <= state.recruitment.lastWageDay) return;
+  state.recruitment.lastWageDay = day;
+  if (state.roster.length === 0) return;
+
+  const total = state.roster.reduce((s, a) => s + BALANCE.WAGE_PER_RARITY[RARITY_INDEX[a.rarity]], 0);
+  if (state.player.gold >= total) {
+    state.player.gold -= total;
+    pushLog(state, 'system', `💰 日薪结算：-${total} 金币（${state.roster.length} 名冒险者）`);
+  } else if (state.tavern.dorm >= 3) {
+    pushLog(state, 'system', `💰 金币不足以支付日薪（需 ${total}），温馨的宿舍留住了大家`);
+  } else {
+    for (const a of state.roster) {
+      a.loyalty = Math.max(0, a.loyalty - BALANCE.LOYALTY_DECAY_NO_BUFF);
+    }
+    pushLog(state, 'system', `⚠️ 金币不足以支付日薪（需 ${total}），全队忠诚度下降`);
+  }
+
+  // 当日无生效菜肴 → 忠诚度缓慢流失（伙食差留不住人）
+  if (state.kitchen.buffs.length === 0) {
+    for (const a of state.roster) {
+      a.loyalty = Math.max(0, a.loyalty - BALANCE.LOYALTY_DECAY_NO_BUFF);
+    }
+  }
+
+  // 忠诚归零 → 离店
+  const leaving = state.roster.filter((a) => a.loyalty <= 0);
+  if (leaving.length > 0) {
+    state.roster = state.roster.filter((a) => a.loyalty > 0);
+    for (const adv of leaving) {
+      const slot = state.party.indexOf(adv.id);
+      if (slot >= 0) state.party[slot] = null;
+      pushLog(state, 'system', `💔 ${adv.name} 对酒馆彻底失望，收拾行李离开了`);
+    }
+  }
+}
+
+function checkRecipeUnlocks(state: GameState): void {
+  for (const r of Object.values(RECIPES)) {
+    if (state.kitchen.unlockedRecipes.includes(r.id)) continue;
+    let ok = false;
+    if (r.unlock.type === 'initial') {
+      ok = true;
+    } else if (r.unlock.type === 'floorClear') {
+      ok = state.meta.floorsFirstCleared.includes(floorIdOf(r.unlock.floor));
+    } else if (r.unlock.type === 'reputation') {
+      ok = state.player.reputation >= r.unlock.value;
+    }
+    if (ok) {
+      state.kitchen.unlockedRecipes.push(r.id);
+      const attract = r.attraction.classIds.map((c) => CLASSES[c].name).join('、');
+      pushLog(
+        state,
+        'kitchen',
+        `📖 新菜谱解锁：「${r.name}」${attract ? `（更吸引 ${attract} 的到访）` : ''}`,
+      );
+    }
+  }
 }
