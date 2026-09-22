@@ -10,7 +10,7 @@ import { MATERIALS } from '../data/materials';
 import { FLOOR_DEFS, FLOORS, MONSTERS } from '../data/monsters';
 import { getPartyMembers, type PartyMember } from './party';
 import { rollDropsWithBonus, scaledGain } from './drops';
-import { pushLog } from './log';
+import { pushEvent, pushLog } from './log';
 import {
   adventurerLevelCap,
   expToNext,
@@ -32,6 +32,13 @@ export function spawnWave(state: GameState): void {
     return { uid: state.meta.nextUid++, monsterId: mid, hp: def.base.hp, maxHp: def.base.hp };
   });
   state.dungeon.status = 'combat';
+  pushEvent(state, {
+    kind: 'waveStart',
+    wave: state.dungeon.waveIndex + 1,
+    waveCount: floor.waves.length,
+    isBoss: wave.isBoss ?? false,
+    monsters: state.dungeon.monsters.map((m) => ({ uid: m.uid, monsterId: m.monsterId })),
+  });
   pushLog(
     state,
     'combat',
@@ -39,10 +46,19 @@ export function spawnWave(state: GameState): void {
   );
 }
 
-function rollDamage(atk: number, def: number, rng: () => number, critChance: number, critMult: number): number {
+function rollDamage(
+  atk: number,
+  def: number,
+  rng: () => number,
+  critChance: number,
+  critMult: number,
+): { dmg: number; crit: boolean } {
   const variance = 1 + (rng() * 2 - 1) * BALANCE.DMG_VARIANCE;
-  const crit = rng() < critChance ? critMult : 1;
-  return Math.max(1, Math.round(atk * variance * crit) - def);
+  const crit = rng() < critChance;
+  return {
+    dmg: Math.max(1, Math.round(atk * variance * (crit ? critMult : 1)) - def),
+    crit,
+  };
 }
 
 function gainExp(state: GameState, advId: string, baseExp: number, mult: number, rng: () => number): void {
@@ -59,6 +75,7 @@ function gainExp(state: GameState, advId: string, baseExp: number, mult: number,
     adv.level += 1;
     const maxHp = getAdventurerStats(state, adv).hp;
     adv.hp = Math.min(maxHp, adv.hp + Math.ceil(maxHp * BALANCE.HEAL_ON_LEVEL_UP));
+    pushEvent(state, { kind: 'levelup', targetId: adv.id, level: adv.level });
     pushLog(state, 'level', `🎉 ${adv.name} 升到了 Lv.${adv.level}！`);
     need = expToNext(adv.level);
   }
@@ -67,6 +84,7 @@ function gainExp(state: GameState, advId: string, baseExp: number, mult: number,
 
 function onMonsterKilled(state: GameState, target: MonsterInstance, offlineMult: number, rng: () => number): void {
   const def = MONSTERS[target.monsterId];
+  pushEvent(state, { kind: 'death', side: 'monster', targetUid: target.uid, targetMonsterId: target.monsterId });
   const expMult = offlineMult * getPartyExpMult(state);
   for (const m of getPartyMembers(state)) {
     gainExp(state, m.adv.id, def.exp, expMult, rng);
@@ -108,9 +126,22 @@ function attackMonster(
   critMult: number,
 ): void {
   const def = MONSTERS[target.monsterId];
-  const dmg = rollDamage(atk, def.base.def, rng, critChance, critMult);
+  const { dmg, crit } = rollDamage(atk, def.base.def, rng, critChance, critMult);
   target.hp -= dmg;
-  pushLog(state, 'combat', `${CLASSES[member.adv.classId].icon} ${member.adv.name} 对 ${def.name} 造成 ${dmg} 伤害`);
+  pushEvent(state, {
+    kind: 'hit',
+    attackerSide: 'party',
+    attackerId: member.adv.id,
+    targetUid: target.uid,
+    targetMonsterId: target.monsterId,
+    damage: dmg,
+    crit,
+  });
+  pushLog(
+    state,
+    'combat',
+    `${CLASSES[member.adv.classId].icon} ${member.adv.name} 对 ${def.name} 造成 ${dmg} 伤害${crit ? '（暴击！）' : ''}`,
+  );
   if (target.hp <= 0) onMonsterKilled(state, target, offlineMult, rng);
 }
 
@@ -147,6 +178,15 @@ function memberAct(state: GameState, member: PartyMember, rng: () => number, off
         const variance = 1 + (rng() * 2 - 1) * BALANCE.DMG_VARIANCE;
         const dmg = Math.max(1, Math.round(stats.atk * MAGE_AOE_RATIO * variance) - def.base.def);
         t.hp -= dmg;
+        pushEvent(state, {
+          kind: 'hit',
+          attackerSide: 'party',
+          attackerId: member.adv.id,
+          targetUid: t.uid,
+          targetMonsterId: t.monsterId,
+          damage: dmg,
+          crit: false,
+        });
         pushLog(state, 'combat', `${cls.icon} ${member.adv.name} 的奥术冲击席卷 ${def.name}，造成 ${dmg} 伤害`);
         if (t.hp <= 0) onMonsterKilled(state, t, offlineMult, rng);
       }
@@ -170,6 +210,7 @@ function memberAct(state: GameState, member: PartyMember, rng: () => number, off
         const variance = 1 + (rng() * 2 - 1) * BALANCE.DMG_VARIANCE;
         const heal = Math.max(1, Math.round(stats.atk * PRIEST_HEAL_RATIO * variance));
         target.adv.hp = Math.min(maxHp, target.adv.hp + heal);
+        pushEvent(state, { kind: 'heal', healerId: member.adv.id, targetId: target.adv.id, amount: heal });
         pushLog(state, 'combat', `${cls.icon} ${member.adv.name} 治疗了 ${target.adv.name} ${heal} 点 HP`);
       } else {
         const t = firstAliveMonster(state);
@@ -208,6 +249,7 @@ function onWaveCleared(state: GameState): void {
 
   if (wave.isBoss) {
     state.meta.totalBossKills += 1;
+    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveIndex + 1, isBoss: true });
     if (!state.meta.floorsFirstCleared.includes(floor.id)) {
       state.meta.floorsFirstCleared.push(floor.id);
       state.player.reputation += floor.firstClearReputation;
@@ -220,6 +262,7 @@ function onWaveCleared(state: GameState): void {
     }
     pushLog(state, 'combat', `👑 层底 BOSS 肃清！队伍在本层开始驻farm循环`);
   } else {
+    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveIndex + 1, isBoss: false });
     pushLog(state, 'combat', `✅ 第 ${state.dungeon.waveIndex + 1}/${floor.waves.length} 波肃清，短暂休整…`);
   }
   state.dungeon.status = 'waveRest';
@@ -231,6 +274,7 @@ function onWiped(state: GameState): void {
   state.dungeon.status = 'resting';
   state.dungeon.restRemainingS = restS;
   state.dungeon.waveIndex = 0;
+  pushEvent(state, { kind: 'wipe' });
   pushLog(state, 'combat', `💔 队伍全灭……全员被抬回酒馆休整（约 ${restS} 秒后重返）`);
 }
 
@@ -291,11 +335,21 @@ export function resolveRound(state: GameState, rng: () => number, offlineMult: n
       if (!target) break;
       const def = MONSTERS[mo.monsterId];
       const targetStats = getAdventurerStats(state, target.adv);
-      const dmg = rollDamage(def.base.atk, targetStats.def, rng, 0, 1);
+      const { dmg } = rollDamage(def.base.atk, targetStats.def, rng, 0, 1);
       target.adv.hp -= dmg;
+      pushEvent(state, {
+        kind: 'hit',
+        attackerSide: 'monster',
+        attackerUid: mo.uid,
+        attackerMonsterId: mo.monsterId,
+        targetId: target.adv.id,
+        damage: dmg,
+        crit: false,
+      });
       pushLog(state, 'combat', `${def.icon} ${def.name} 对 ${target.adv.name} 造成 ${dmg} 伤害`);
       if (target.adv.hp <= 0) {
         target.adv.hp = 0;
+        pushEvent(state, { kind: 'death', side: 'party', targetId: target.adv.id });
         pushLog(state, 'combat', `💔 ${target.adv.name} 倒下了！`);
       }
     }

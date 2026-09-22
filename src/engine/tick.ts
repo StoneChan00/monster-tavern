@@ -4,7 +4,7 @@ import { CLASSES } from '../data/classes';
 import { FLOORS, floorIdOf } from '../data/monsters';
 import { resolveRound, spawnWave } from './combat';
 import { getAdventurerStats, RARITY_INDEX } from './stats';
-import { pushLog } from './log';
+import { pushEvent, pushLog } from './log';
 import { generateVisitors } from './recruitment';
 import { getPartyMembers } from './party';
 import type { GameState, TickOptions } from './types';
@@ -41,6 +41,7 @@ function tickOnce(state: GameState, opts: TickOptions): void {
             m.adv.hp = getAdventurerStats(state, m.adv).hp;
           }
           d.waveIndex = 0;
+          pushEvent(state, { kind: 'revive' });
           pushLog(state, 'system', '🛏️ 休整完毕，队伍满血重返地牢！');
         } else {
           d.waveIndex = (d.waveIndex + 1) % FLOORS[d.floorId].waves.length;

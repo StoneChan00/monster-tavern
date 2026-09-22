@@ -57,6 +57,7 @@ export function createInitialState(now: number = Date.now()): GameState {
       farmFloor: 1,
     },
     log: [],
+    events: [],
   };
   const hank = state.roster[0];
   hank.hp = getAdventurerStats(state, hank).hp;
