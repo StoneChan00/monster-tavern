@@ -1,13 +1,15 @@
 /**
- * 魔物酒馆 · 核心类型定义（可序列化，直接构成存档结构）
+ * 魔物酒馆 · 核心类型定义 v2（Phase 1：多冒险者/招募/多设施/多层地牢）
  *
  * 约定：
  * - 引擎函数直接就地修改传入的 state 并返回它（单一所有者是 store；
  *   测试需要快照时自行 structuredClone）。
  * - state.log 是战斗/掉落事件的唯一记录流 —— Phase 2 战斗视口将订阅它做动画回放。
+ * - meta.now 是"模拟时钟"（每 tick +1000ms）：招募到访、日薪结算都基于它推进，
+ *   保证离线快进与在线经历完全一致的时间事件。
  */
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export type Rarity = 'common' | 'fine' | 'rare' | 'epic' | 'legendary';
 export type ClassId = string;
@@ -17,6 +19,9 @@ export type RecipeId = string;
 export type FloorId = string;
 
 export type BuffStat = 'atk' | 'def' | 'hp' | 'spd' | 'expGain' | 'dropRate';
+
+/** 职业战斗行为 */
+export type CombatStyle = 'strike' | 'aoe' | 'assassin' | 'heal' | 'snipe' | 'inspire';
 
 export interface BaseStats {
   hp: number;
@@ -32,8 +37,18 @@ export interface AdventurerState {
   rarity: Rarity;
   level: number;
   exp: number;
-  hp: number; // 当前 HP（上限由 getEffectiveStats 计算）
-  loyalty: number; // 0~100
+  hp: number; // 当前 HP（上限由 getAdventurerStats 计算）
+  loyalty: number; // 0~100；归零离店
+}
+
+/** 到访酒馆、可签约的冒险者 */
+export interface Visitor {
+  uid: number;
+  name: string;
+  classId: ClassId;
+  rarity: Rarity;
+  costGold: number;
+  costMaterial: { materialId: MaterialId; count: number };
 }
 
 export interface MonsterInstance {
@@ -63,7 +78,7 @@ export interface ActiveBuff {
 export type LogKind = 'combat' | 'loot' | 'level' | 'kitchen' | 'tavern' | 'system';
 export interface LogEntry {
   id: number;
-  time: number; // Unix ms
+  time: number; // 模拟时钟（meta.now）
   kind: LogKind;
   text: string;
 }
@@ -73,18 +88,31 @@ export interface GameState {
   meta: {
     createdAt: number;
     lastSavedAt: number;
+    /** 模拟时钟（Unix ms），每 tick +1000 */
+    now: number;
     nextUid: number;
     lifetimeGoldEarned: number;
     lifetimeExpEarned: number;
     totalWavesCleared: number;
     totalBossKills: number;
-    bossFirstCleared: boolean;
+    /** 已首杀 BOSS 的楼层（首杀声望仅一次） */
+    floorsFirstCleared: FloorId[];
   };
   player: {
     gold: number;
     reputation: number;
   };
-  adventurer: AdventurerState;
+  /** 已签约冒险者（编队 + 替补席） */
+  roster: AdventurerState[];
+  /** 5 个编队槽位，存 roster id；顺序 = 槽位编号，站位由 SLOT_ROWS 决定 */
+  party: (string | null)[];
+  recruitment: {
+    visitors: Visitor[];
+    /** 下批到访的模拟时间（Unix ms） */
+    nextVisitAt: number;
+    /** 上次日薪结算的模拟天数 */
+    lastWageDay: number;
+  };
   inventory: Record<string, number>;
   kitchen: {
     job: CookingJob | null;
@@ -92,7 +120,11 @@ export interface GameState {
     buffs: ActiveBuff[];
   };
   tavern: {
-    trainingGround: number; // 训练场等级 0~5
+    trainingGround: number; // 训练场 0~5：等级上限/全属性
+    lounge: number; // 招待区 0~5：替补席上限/到访批次
+    kitchen: number; // 厨房 0~4：生效菜谱数/烹饪速度
+    dorm: number; // 宿舍 0~5：休整速度/忠诚保护
+    intel: number; // 情报网 0~4：掉落情报/预览层数
   };
   dungeon: {
     floorId: FloorId;
@@ -100,6 +132,10 @@ export interface GameState {
     status: DungeonStatus;
     restRemainingS: number; // waveRest / resting 剩余秒数
     monsters: MonsterInstance[];
+    /** 已解锁的最高层（数字 1~10） */
+    highestFloor: number;
+    /** 驻farm层（玩家可随时切换，≤ highestFloor） */
+    farmFloor: number;
   };
   log: LogEntry[];
 }
