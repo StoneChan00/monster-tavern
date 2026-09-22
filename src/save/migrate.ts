@@ -72,9 +72,27 @@ function migrateV1toV2(s: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/**
+ * v2（Phase 1）→ v3（Phase 2 内容扩展）：
+ * 冒险者与访客补 D&D 种族字段（默认人类）。
+ */
+function migrateV2toV3(s: Record<string, unknown>): Record<string, unknown> {
+  const roster = ((s.roster ?? []) as Array<Record<string, unknown>>).map((a) => ({
+    race: 'human',
+    ...a,
+  }));
+  const rec = (s.recruitment ?? {}) as Record<string, unknown>;
+  const visitors = ((rec.visitors ?? []) as Array<Record<string, unknown>>).map((v) => ({
+    race: 'human',
+    ...v,
+  }));
+  return { ...s, version: 3, roster, recruitment: { ...rec, visitors } };
+}
+
 /** 版本迁移链：migrations[n] 把 v_n 档案升级到 v_{n+1}。新增版本时在此追加。 */
 const migrations: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
   1: migrateV1toV2,
+  2: migrateV2toV3,
 };
 
 export function serialize(state: GameState): string {
