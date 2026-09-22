@@ -1,5 +1,6 @@
 import { BALANCE, visitBatchSize } from '../data/balance';
 import { CLASSES } from '../data/classes';
+import { RACES, RACE_LIST } from '../data/races';
 import { RECIPES } from '../data/recipes';
 import type { GameState, Rarity, Visitor } from './types';
 
@@ -51,7 +52,8 @@ const SIGN_MATERIAL: Record<Rarity, { materialId: string; count: number }> = {
 
 /**
  * 生成一批到访冒险者。
- * 职业分布 ← 已解锁菜谱的吸引力；稀有度分布 ← 酒馆声望。
+ * 种族按种族权重随机；职业分布 ← 已解锁菜谱的吸引力；稀有度分布 ← 酒馆声望；
+ * 姓名取自种族名字池（D&D 风味）。
  */
 export function generateVisitors(state: GameState, rng: () => number): Visitor[] {
   const size = visitBatchSize(state.tavern.lounge);
@@ -61,13 +63,16 @@ export function generateVisitors(state: GameState, rng: () => number): Visitor[]
   const visitors: Visitor[] = [];
   for (let i = 0; i < size; i++) {
     const classId = pickWeighted(classIds, classIds.map((c) => cWeights.get(c) ?? 10), rng);
+    const raceDef = pickWeighted(RACE_LIST, RACE_LIST.map((r) => r.weight), rng);
     const rarity = pickWeighted(RARITIES, rWeights, rng);
     const cls = CLASSES[classId];
-    const name = cls.namePool[Math.floor(rng() * cls.namePool.length)];
+    const race = RACES[raceDef.id] ?? RACES.human;
+    const name = race.namePool[Math.floor(rng() * race.namePool.length)];
     visitors.push({
       uid: state.meta.nextUid++,
       name,
       classId,
+      race: cls && race ? race.id : 'human',
       rarity,
       costGold: BALANCE.SIGN_COST_GOLD[RARITIES.indexOf(rarity)],
       costMaterial: { ...SIGN_MATERIAL[rarity] },

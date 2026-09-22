@@ -1,6 +1,7 @@
 import { BALANCE } from '../data/balance';
 import { BARD_AURA, CLASSES } from '../data/classes';
 import { activeBonds } from '../data/bonds';
+import { RACES } from '../data/races';
 import { getPartyMembers } from './party';
 import type { AdventurerState, BaseStats, BuffStat, ClassId, GameState, Rarity } from './types';
 
@@ -51,12 +52,13 @@ export function alivePartyClasses(state: GameState): ClassId[] {
 }
 
 /**
- * 结算后的最终属性 = 职业基础 + 等级成长
+ * 结算后的最终属性 = 职业基础 + 种族修正 + 等级成长
  * × 稀有度 × 训练场 × 忠诚度 × 菜肴 buff × 羁绊（编队） × 诗人光环（编队）
  * Math.round 而非 floor：低数值时保证加成可感知。
  */
 export function getAdventurerStats(state: GameState, adv: AdventurerState): BaseStats {
   const cls = CLASSES[adv.classId];
+  const race = RACES[adv.race] ?? RACES.human;
   const lv = adv.level;
   const rarityMult = RARITY_MULT[adv.rarity];
   const trainMult = 1 + state.tavern.trainingGround * 0.08;
@@ -74,14 +76,30 @@ export function getAdventurerStats(state: GameState, adv: AdventurerState): Base
     if (alive.includes('bard')) bondAtk *= BARD_AURA.mult;
   }
 
-  const roll = (base: number, per: number, stat: BuffStat, partyMult: number) =>
-    Math.max(1, Math.round((base + per * (lv - 1)) * rarityMult * trainMult * loyaltyMult * dishBuffMult(state, stat) * partyMult));
+  const roll = (
+    base: number,
+    per: number,
+    raceMod: number,
+    stat: BuffStat,
+    partyMult: number,
+  ) =>
+    Math.max(
+      1,
+      Math.round(
+        (base + raceMod + per * (lv - 1)) *
+          rarityMult *
+          trainMult *
+          loyaltyMult *
+          dishBuffMult(state, stat) *
+          partyMult,
+      ),
+    );
 
   return {
-    hp: roll(cls.base.hp, cls.perLevel.hp, 'hp', 1),
-    atk: roll(cls.base.atk, cls.perLevel.atk, 'atk', bondAtk),
-    def: roll(cls.base.def, cls.perLevel.def, 'def', bondDef),
-    spd: roll(cls.base.spd, cls.perLevel.spd, 'spd', 1),
+    hp: roll(cls.base.hp, cls.perLevel.hp, race.statMods.hp ?? 0, 'hp', 1),
+    atk: roll(cls.base.atk, cls.perLevel.atk, race.statMods.atk ?? 0, 'atk', bondAtk),
+    def: roll(cls.base.def, cls.perLevel.def, race.statMods.def ?? 0, 'def', bondDef),
+    spd: roll(cls.base.spd, cls.perLevel.spd, race.statMods.spd ?? 0, 'spd', 1),
   };
 }
 
