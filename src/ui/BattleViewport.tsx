@@ -44,11 +44,10 @@ export function BattleViewport() {
 
     let destroyed = false;
     const app = new Application();
-    const loadedTiles: { floor: Texture | null; wall: Texture | null } = { floor: null, wall: null };
+    const loadedTiles: { floor: Texture | null } = { floor: null };
     const textureCache = new Map<MonsterId, Texture>();
     const classTextureCache = new Map<ClassId, Texture>();
     let floorLayer: TilingSprite | null = null;
-    let wallLayer: TilingSprite | null = null;
     let dimLayer: Graphics | null = null;
     const partyUnits = new Map<string, Unit>();
     const monsterUnits = new Map<number, Unit>();
@@ -286,9 +285,8 @@ export function BattleViewport() {
       const w = Math.max(240, host.clientWidth);
       app.renderer.resize(w, VIEW_H);
       if (floorLayer) floorLayer.width = w;
-      if (wallLayer) wallLayer.width = w;
       if (dimLayer) {
-        dimLayer.clear().rect(0, 0, w, VIEW_H).fill({ color: 0x141009, alpha: 0.35 });
+        dimLayer.clear().rect(0, 0, w, VIEW_H).fill({ color: 0x141009, alpha: 0.4 });
       }
       relayout();
     });
@@ -302,7 +300,6 @@ export function BattleViewport() {
           ...monsterEntries.map(([, file]) => `/sprites/monsters/${file}`),
           ...classEntries.map(([, file]) => `/sprites/classes/${file}`),
           `/sprites/tiles/${TILE_SPRITES.floor}`,
-          `/sprites/tiles/${TILE_SPRITES.wall}`,
         ];
         const textures = await Assets.load(urls);
         for (const [id, file] of monsterEntries) {
@@ -320,11 +317,8 @@ export function BattleViewport() {
           }
         }
         const floorTex = textures[`/sprites/tiles/${TILE_SPRITES.floor}`];
-        const wallTex = textures[`/sprites/tiles/${TILE_SPRITES.wall}`];
         if (floorTex) floorTex.source.scaleMode = 'nearest';
-        if (wallTex) wallTex.source.scaleMode = 'nearest';
         loadedTiles.floor = floorTex ?? null;
-        loadedTiles.wall = wallTex ?? null;
       } catch {
         /* emoji /纯色 回退 */
       }
@@ -348,19 +342,14 @@ export function BattleViewport() {
       host.appendChild(app.canvas);
       ro.observe(host);
 
-      // 地牢背景：墙体条带（顶）+ 地板平铺（其余）+ 压暗层（保可读性）
+      // 地牢背景：地板平铺 + 压暗层（保可读性）
       const initW = Math.max(240, host.clientWidth);
       if (loadedTiles.floor) {
         floorLayer = new TilingSprite({ texture: loadedTiles.floor, width: initW, height: VIEW_H });
         floorLayer.tileScale.set(2);
         app.stage.addChild(floorLayer);
       }
-      if (loadedTiles.wall) {
-        wallLayer = new TilingSprite({ texture: loadedTiles.wall, width: initW, height: 32 });
-        wallLayer.tileScale.set(2);
-        app.stage.addChild(wallLayer);
-      }
-      dimLayer = new Graphics().rect(0, 0, initW, VIEW_H).fill({ color: 0x141009, alpha: 0.35 });
+      dimLayer = new Graphics().rect(0, 0, initW, VIEW_H).fill({ color: 0x141009, alpha: 0.4 });
       app.stage.addChild(dimLayer);
 
       // 初始同步：跳过历史积压，从当前战斗状态直接开始
