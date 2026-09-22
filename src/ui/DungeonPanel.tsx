@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { Bar } from './Bar';
+import { BattleViewport } from './BattleViewport';
 import { MonsterSprite } from './SpriteIcon';
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
@@ -68,6 +69,9 @@ export function DungeonPanel() {
         icon={floor.icon}
       >
         <div className="space-y-3 text-xs">
+          {/* 战斗视口（事件流回放） */}
+          <BattleViewport />
+
           {/* 队伍血条 */}
           <div>
             <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-[#a89880]">
