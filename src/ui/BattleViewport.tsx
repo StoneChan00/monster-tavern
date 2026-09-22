@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { Application, Assets, Container, Sprite, Text, Texture } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
 import { MONSTERS } from '../data/monsters';
-import { MONSTER_SPRITES } from '../data/sprites';
+import { CLASS_SPRITES, MONSTER_SPRITES, TILE_SPRITES } from '../data/sprites';
 import { getPartyMembers } from '../engine/party';
-import type { EventRecord, GameState, MonsterId } from '../engine/types';
+import type { ClassId, EventRecord, GameState, MonsterId } from '../engine/types';
 
 const VIEW_H = 190;
 const SPRITE_SCALE = 3;
@@ -44,7 +44,12 @@ export function BattleViewport() {
 
     let destroyed = false;
     const app = new Application();
+    const loadedTiles: { floor: Texture | null; wall: Texture | null } = { floor: null, wall: null };
     const textureCache = new Map<MonsterId, Texture>();
+    const classTextureCache = new Map<ClassId, Texture>();
+    let floorLayer: TilingSprite | null = null;
+    let wallLayer: TilingSprite | null = null;
+    let dimLayer: Graphics | null = null;
     const partyUnits = new Map<string, Unit>();
     const monsterUnits = new Map<number, Unit>();
     const queue: EventRecord[] = [];
@@ -69,13 +74,21 @@ export function BattleViewport() {
         if (tex) {
           const sp = new Sprite(tex);
           sp.anchor.set(0.5);
-          sp.scale.set(SPRITE_SCALE);
+          // 魔物在右侧，镜像朝向左（面向队伍）
+          sp.scale.set(-SPRITE_SCALE, SPRITE_SCALE);
           return sp;
         }
         return new Text({
           text: MONSTERS[monsterId]?.icon ?? '❔',
           style: { fontFamily: 'sans-serif', fontSize: 30 },
         });
+      }
+      const classTex = classId ? classTextureCache.get(classId) : undefined;
+      if (classTex) {
+        const sp = new Sprite(classTex);
+        sp.anchor.set(0.5);
+        sp.scale.set(SPRITE_SCALE);
+        return sp;
       }
       return new Text({
         text: CLASSES[classId ?? 'warrior']?.icon ?? '🧑',
@@ -270,25 +283,50 @@ export function BattleViewport() {
 
     const ro = new ResizeObserver(() => {
       if (destroyed) return;
-      app.renderer.resize(Math.max(240, host.clientWidth), VIEW_H);
+      const w = Math.max(240, host.clientWidth);
+      app.renderer.resize(w, VIEW_H);
+      if (floorLayer) floorLayer.width = w;
+      if (wallLayer) wallLayer.width = w;
+      if (dimLayer) {
+        dimLayer.clear().rect(0, 0, w, VIEW_H).fill({ color: 0x141009, alpha: 0.35 });
+      }
       relayout();
     });
 
     void (async () => {
-      // 预载魔物像素贴图（CC0 Kenney），失败则回退 emoji
-      const entries = Object.entries(MONSTER_SPRITES);
+      // 预载像素贴图（CC0 Kenney），失败则回退 emoji
+      const monsterEntries = Object.entries(MONSTER_SPRITES);
+      const classEntries = Object.entries(CLASS_SPRITES);
       try {
-        const urls = entries.map(([, file]) => `/sprites/monsters/${file}`);
+        const urls = [
+          ...monsterEntries.map(([, file]) => `/sprites/monsters/${file}`),
+          ...classEntries.map(([, file]) => `/sprites/classes/${file}`),
+          `/sprites/tiles/${TILE_SPRITES.floor}`,
+          `/sprites/tiles/${TILE_SPRITES.wall}`,
+        ];
         const textures = await Assets.load(urls);
-        for (const [id, file] of entries) {
+        for (const [id, file] of monsterEntries) {
           const tex = textures[`/sprites/monsters/${file}`];
           if (tex) {
             tex.source.scaleMode = 'nearest';
             textureCache.set(id, tex);
           }
         }
+        for (const [id, file] of classEntries) {
+          const tex = textures[`/sprites/classes/${file}`];
+          if (tex) {
+            tex.source.scaleMode = 'nearest';
+            classTextureCache.set(id, tex);
+          }
+        }
+        const floorTex = textures[`/sprites/tiles/${TILE_SPRITES.floor}`];
+        const wallTex = textures[`/sprites/tiles/${TILE_SPRITES.wall}`];
+        if (floorTex) floorTex.source.scaleMode = 'nearest';
+        if (wallTex) wallTex.source.scaleMode = 'nearest';
+        loadedTiles.floor = floorTex ?? null;
+        loadedTiles.wall = wallTex ?? null;
       } catch {
-        /* emoji 回退 */
+        /* emoji /纯色 回退 */
       }
 
       await app.init({
@@ -309,6 +347,21 @@ export function BattleViewport() {
       }
       host.appendChild(app.canvas);
       ro.observe(host);
+
+      // 地牢背景：墙体条带（顶）+ 地板平铺（其余）+ 压暗层（保可读性）
+      const initW = Math.max(240, host.clientWidth);
+      if (loadedTiles.floor) {
+        floorLayer = new TilingSprite({ texture: loadedTiles.floor, width: initW, height: VIEW_H });
+        floorLayer.tileScale.set(2);
+        app.stage.addChild(floorLayer);
+      }
+      if (loadedTiles.wall) {
+        wallLayer = new TilingSprite({ texture: loadedTiles.wall, width: initW, height: 32 });
+        wallLayer.tileScale.set(2);
+        app.stage.addChild(wallLayer);
+      }
+      dimLayer = new Graphics().rect(0, 0, initW, VIEW_H).fill({ color: 0x141009, alpha: 0.35 });
+      app.stage.addChild(dimLayer);
 
       // 初始同步：跳过历史积压，从当前战斗状态直接开始
       const state0 = useGameStore.getState().state;
