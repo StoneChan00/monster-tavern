@@ -9,10 +9,11 @@
  *   保证离线快进与在线经历完全一致的时间事件。
  */
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export type Rarity = 'common' | 'fine' | 'rare' | 'epic' | 'legendary';
 export type ClassId = string;
+export type RaceId = string;
 export type MonsterId = string;
 export type MaterialId = string;
 export type RecipeId = string;
@@ -34,6 +35,8 @@ export interface AdventurerState {
   id: string;
   name: string;
   classId: ClassId;
+  /** D&D 5E 种族（属性修正 + 名字风味） */
+  race: RaceId;
   rarity: Rarity;
   level: number;
   exp: number;
@@ -46,6 +49,7 @@ export interface Visitor {
   uid: number;
   name: string;
   classId: ClassId;
+  race: RaceId;
   rarity: Rarity;
   costGold: number;
   costMaterial: { materialId: MaterialId; count: number };
