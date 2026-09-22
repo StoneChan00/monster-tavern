@@ -26,6 +26,8 @@ export const BALANCE = {
   LOYALTY_STAT_BONUS: 0.15,
   /** 日志环形缓冲上限 */
   LOG_LIMIT: 80,
+  /** 事件流环形缓冲上限（战斗视口回放） */
+  EVENT_LIMIT: 150,
   /** 勇者（非盗贼）暴击率与倍率 */
   CRIT_CHANCE: 0.05,
   CRIT_MULT: 1.5,

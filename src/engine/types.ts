@@ -83,6 +83,49 @@ export interface LogEntry {
   text: string;
 }
 
+/**
+ * 结构化战斗事件流 —— Phase 2 BattleViewport 的回放数据源。
+ * 与文本日志（state.log）并行生成：log 面向玩家阅读，events 面向渲染回放。
+ */
+export type EngineEvent =
+  /** 冒险者 → 魔物 */
+  | {
+      kind: 'hit';
+      attackerSide: 'party';
+      attackerId: string;
+      targetUid: number;
+      targetMonsterId: MonsterId;
+      damage: number;
+      crit: boolean;
+    }
+  /** 魔物 → 冒险者 */
+  | {
+      kind: 'hit';
+      attackerSide: 'monster';
+      attackerUid: number;
+      attackerMonsterId: MonsterId;
+      targetId: string;
+      damage: number;
+      crit: boolean;
+    }
+  | { kind: 'heal'; healerId: string; targetId: string; amount: number }
+  | { kind: 'death'; side: 'party'; targetId: string }
+  | { kind: 'death'; side: 'monster'; targetUid: number; targetMonsterId: MonsterId }
+  | {
+      kind: 'waveStart';
+      wave: number; // 1-based
+      waveCount: number;
+      isBoss: boolean;
+      monsters: Array<{ uid: number; monsterId: MonsterId }>;
+    }
+  | { kind: 'waveClear'; wave: number; isBoss: boolean }
+  | { kind: 'wipe' }
+  | { kind: 'revive' }
+  | { kind: 'levelup'; targetId: string; level: number };
+
+/** 带唯一序号与时间戳的事件记录（瞬态：不存档，随存档剥离） */
+export type EventRecord = EngineEvent & { id: number; time: number };
+
 export interface GameState {
   version: number;
   meta: {
@@ -138,6 +181,8 @@ export interface GameState {
     farmFloor: number;
   };
   log: LogEntry[];
+  /** 瞬态事件流（回放用，不存档） */
+  events: EventRecord[];
 }
 
 export interface TickOptions {
