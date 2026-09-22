@@ -27,3 +27,25 @@ export function rollDrops(
   }
   return [];
 }
+
+/**
+ * 带掉落率加成的掉落：dropMult > 1 时按 (dropMult - 1) 概率追加一次掉落，
+ * 同类材料自动合并。
+ */
+export function rollDropsWithBonus(
+  def: MonsterDef,
+  gainMult: number,
+  dropMult: number,
+  rng: () => number,
+): Array<{ materialId: string; count: number }> {
+  let drops = rollDrops(def, gainMult, rng);
+  if (dropMult > 1 && rng() < dropMult - 1) {
+    const extra = rollDrops(def, gainMult, rng);
+    const merged = new Map(drops.map((d) => [d.materialId, d.count]));
+    for (const d of extra) {
+      merged.set(d.materialId, (merged.get(d.materialId) ?? 0) + d.count);
+    }
+    drops = [...merged.entries()].map(([materialId, count]) => ({ materialId, count }));
+  }
+  return drops;
+}
