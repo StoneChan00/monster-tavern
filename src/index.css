@@ -109,3 +109,24 @@ body {
   display: inline-block;
   animation: bubble 0.8s ease-in-out infinite;
 }
+
+/* 下拉选择器（编队指派） */
+.pixel-select {
+  border: 2px solid #5c4325;
+  background: #1f1812;
+  color: #f0e6d2;
+  padding: 2px 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pixel-select:focus {
+  outline: 1px solid #d9a441;
+}
+
+/* 像素精灵图（禁用平滑，保持锐利） */
+.pixel-img {
+  image-rendering: pixelated;
+  display: inline-block;
+  vertical-align: middle;
+}
