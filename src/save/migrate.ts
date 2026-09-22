@@ -78,10 +78,12 @@ const migrations: Record<number, (s: Record<string, unknown>) => Record<string, 
 };
 
 export function serialize(state: GameState): string {
+  // events 是瞬态回放流，不进存档
+  const { events: _events, ...persistable } = state;
   return JSON.stringify({
     magic: SAVE_MAGIC,
     version: SAVE_VERSION,
-    state,
+    state: persistable,
     exportedAt: Date.now(),
   } satisfies SaveEnvelope);
 }
@@ -103,6 +105,7 @@ export function deserialize(raw: string): GameState | null {
     }
     const state = data as unknown as GameState;
     state.version = SAVE_VERSION;
+    state.events = []; // 瞬态字段：旧档/剥离档统一补空
     return state;
   } catch {
     return null;
