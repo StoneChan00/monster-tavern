@@ -14,7 +14,7 @@ import { MONSTERS } from '../src/data/monsters';
 import { RECIPES } from '../src/data/recipes';
 import { fmtNum } from '../src/utils/format';
 import { SAVE_VERSION } from '../src/engine/types';
-import type { AdventurerState, GameState } from '../src/engine/types';
+import type { AdventurerState, GameState, OfflineReport } from '../src/engine/types';
 
 /** 固定时间戳的新档，保证测试可重复 */
 function freshState(): GameState {
@@ -504,6 +504,42 @@ describe('离线结算', () => {
     const s = freshState();
     applyOffline(s, 3 * 3600, { rng: mulberry32(13) });
     expect(s.recruitment.visitors.length).toBe(BALANCE.VISIT_BATCH_BASE);
+  });
+});
+
+describe('欢迎回来弹窗稳定性', () => {
+  const fakeReport: OfflineReport = {
+    awaySeconds: 3600,
+    appliedSeconds: 3600,
+    efficiency: 0.6,
+    gold: 100,
+    exp: 50,
+    levelsGained: 1,
+    materials: { mat_gel: 5 },
+    wavesCleared: 10,
+    bossKills: 1,
+  };
+
+  it('已有待确认报告时，catchUp 不得清空或替换它（闪没修复）', () => {
+    const s = freshState();
+    setStoreState(s);
+    useGameStore.setState({ offlineReport: fakeReport });
+    // 后台页签 61~120s 补算：旧代码会把报告清成 null
+    useGameStore.getState().catchUp(90);
+    expect(useGameStore.getState().offlineReport).toEqual(fakeReport);
+    // 更长的隐藏（> 阈值）也保留原报告，不替换
+    useGameStore.getState().catchUp(300);
+    expect(useGameStore.getState().offlineReport).toEqual(fakeReport);
+  });
+
+  it('无待确认报告时：超阈值出新报告，低于阈值静默结算', () => {
+    const s = freshState();
+    setStoreState(s);
+    useGameStore.getState().catchUp(300);
+    expect(useGameStore.getState().offlineReport).not.toBeNull();
+    useGameStore.getState().dismissOfflineReport();
+    useGameStore.getState().catchUp(90);
+    expect(useGameStore.getState().offlineReport).toBeNull();
   });
 });
 

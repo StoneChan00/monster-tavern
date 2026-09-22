@@ -138,10 +138,15 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   catchUp: (gapSeconds) => {
     const s = get().state;
     const result = applyOffline(s, gapSeconds);
+    const pending = get().offlineReport;
+    const fresh =
+      result.report && gapSeconds > BALANCE.WELCOME_BACK_THRESHOLD_S ? result.report : null;
     set({
       state: { ...s },
-      offlineReport:
-        result.report && gapSeconds > BALANCE.WELCOME_BACK_THRESHOLD_S ? result.report : null,
+      // 关键修复：已有待确认的「欢迎回来」报告时，后续补算不得清空/替换它。
+      // 旧逻辑在后台页签 61~120s 的 catchUp 中会把报告置 null，
+      // 导致 initStore 刚设置的弹窗"闪一下消失"。
+      offlineReport: pending ?? fresh,
       clockWarning: result.clockTampered || get().clockWarning,
     });
   },
