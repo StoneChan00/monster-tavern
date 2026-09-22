@@ -33,10 +33,14 @@ export function WelcomeBackModal() {
               （效率 {Math.round(report.efficiency * 100)}%）
             </p>
             <div className="space-y-1 border-2 border-[#3a2d1e] bg-[#1f1812] p-3 text-xs">
-              <Row label="💰 金币" value={`+${fmtNum(report.gold)}`} />
+              <Row
+                label="💰 金币"
+                value={`${report.gold >= 0 ? '+' : ''}${fmtNum(report.gold)}`}
+                highlight={report.gold < 0 ? false : true}
+              />
               <Row label="⭐ 经验" value={`+${fmtNum(report.exp)}`} />
               {report.levelsGained > 0 ? (
-                <Row label="🎉 升级" value={`+${report.levelsGained} 级`} highlight />
+                <Row label="🎉 全队等级" value={`+${report.levelsGained} 级`} highlight />
               ) : null}
               <Row label="🌊 清波" value={`+${report.wavesCleared}`} />
               {report.bossKills > 0 ? (
