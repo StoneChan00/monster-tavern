@@ -1,7 +1,9 @@
 import { Panel } from './Panel';
 import { Bar } from './Bar';
+import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
+import { RACES } from '../data/races';
 import { BALANCE } from '../data/balance';
 import {
   adventurerLevelCap,
@@ -39,12 +41,12 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
           {adv.name} · {RARITY_LABEL[adv.rarity]}
         </span>
       }
-      icon={cls.icon}
+      icon={<CharacterSprite classId={adv.classId} size={18} />}
     >
       <div className="space-y-2 text-xs">
         <div className="flex items-baseline justify-between">
           <span className="text-[#a89880]">
-            {cls.role}
+            {RACES[adv.race]?.name ?? '人类'} · {cls.name} · {cls.role.split(' / ')[0]}
             {inParty ? ' · ⚑ 出征中' : ' · 替补'}
           </span>
           <span className="font-bold text-[#f0d78c]">

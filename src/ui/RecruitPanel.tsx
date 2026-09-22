@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Panel } from './Panel';
+import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
+import { RACES } from '../data/races';
 import { MATERIALS } from '../data/materials';
 import { RARITY_LABEL } from '../engine/stats';
 import { fmtDuration } from '../utils/format';
@@ -59,12 +61,12 @@ function VisitorCard({
   return (
     <div className="border-2 border-[#3a2d1e] bg-[#1f1812] p-2 text-xs">
       <div className="flex items-center gap-1.5">
-        <span className="text-base leading-none">{cls.icon}</span>
+        <CharacterSprite classId={visitor.classId} size={22} />
         <span className="truncate font-bold" style={{ color: RARITY_COLOR[visitor.rarity] }}>
           {visitor.name}
         </span>
         <span className="ml-auto text-[10px] text-[#a89880]">
-          {cls.name} · {RARITY_LABEL[visitor.rarity]}
+          {RACES[visitor.race]?.name ?? '人类'} · {cls.name} · {RARITY_LABEL[visitor.rarity]}
         </span>
       </div>
       <div className="mt-1.5 text-[11px] text-[#a89880]">

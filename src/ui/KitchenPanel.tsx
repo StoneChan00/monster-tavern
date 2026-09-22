@@ -108,6 +108,9 @@ function RecipeCard({ recipe, onCook }: { recipe: RecipeDef; onCook: (id: string
           {recipe.icon} {recipe.name}
         </span>
       </div>
+      {recipe.desc ? (
+        <div className="mt-1 text-[10px] italic leading-relaxed text-[#8a7a62]">"{recipe.desc}"</div>
+      ) : null}
       <div className="mt-1.5 space-y-0.5 text-[11px] text-[#a89880]">
         <div>
           费用：💰{recipe.cost.gold}

@@ -2,9 +2,11 @@ import { Panel } from './Panel';
 import { AdventurerCard } from './AdventurerCard';
 import { RecruitPanel } from './RecruitPanel';
 import { Bar } from './Bar';
+import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
 import { BALANCE } from '../data/balance';
 import { CLASSES } from '../data/classes';
+import { RACES } from '../data/races';
 import { isSlotUnlocked } from '../engine/party';
 import { getAdventurerStats } from '../engine/stats';
 import type { GameState } from '../engine/types';
@@ -86,10 +88,10 @@ function SlotContent({ slot, state }: { slot: number; state: GameState }) {
       {adv ? (
         <div>
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-base leading-none">{CLASSES[adv.classId].icon}</span>
+            <CharacterSprite classId={adv.classId} size={18} />
             <span className="truncate font-bold">{adv.name}</span>
             <span className="ml-auto text-[10px] text-[#a89880]">
-              {CLASSES[adv.classId].name} · Lv{adv.level}
+              {RACES[adv.race]?.name ?? '人类'} · {CLASSES[adv.classId].name} · Lv{adv.level}
             </span>
           </div>
           <Bar
@@ -112,7 +114,8 @@ function SlotContent({ slot, state }: { slot: number; state: GameState }) {
         <option value="">（空位）</option>
         {s.roster.map((a) => (
           <option key={a.id} value={a.id}>
-            {CLASSES[a.classId].icon} {a.name} · {CLASSES[a.classId].name} · Lv{a.level}
+            {CLASSES[a.classId].icon} {a.name} · {RACES[a.race]?.name ?? '人类'}
+            {CLASSES[a.classId].name} · Lv{a.level}
           </option>
         ))}
       </select>
