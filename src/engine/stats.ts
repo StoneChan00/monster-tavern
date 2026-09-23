@@ -3,40 +3,35 @@ import { BARD_AURA, CLASSES } from '../data/classes';
 import { activeBonds } from '../data/bonds';
 import { RACES } from '../data/races';
 import { getPartyMembers } from './party';
-import type { AdventurerState, BaseStats, BuffStat, ClassId, GameState, Rarity } from './types';
+import { LEVEL_CAP } from './types';
+import type { AdventurerState, BaseStats, BuffStat, ClassId, GameState } from './types';
 
-export const RARITY_MULT: Record<Rarity, number> = {
-  common: 1,
-  fine: 1.3,
-  rare: 1.7,
-  epic: 2.2,
-  legendary: 3,
-};
+/**
+ * D&D 等级档位（等级 = 稀有度）：着色与称号按等级区间划分。
+ * Lv9-10 传奇（金色）世界屈指可数。
+ */
+export interface LevelTier {
+  label: string;
+  color: string;
+}
 
-export const RARITY_INDEX: Record<Rarity, number> = {
-  common: 0,
-  fine: 1,
-  rare: 2,
-  epic: 3,
-  legendary: 4,
-};
+export function levelTier(level: number): LevelTier {
+  if (level >= 9) return { label: '传奇', color: '#e8a33d' };
+  if (level >= 7) return { label: '大师', color: '#a569d8' };
+  if (level >= 5) return { label: '资深', color: '#5b9bd5' };
+  if (level >= 3) return { label: '老练', color: '#7cb342' };
+  return { label: '学徒', color: '#a89880' };
+}
 
-export const RARITY_LABEL: Record<Rarity, string> = {
-  common: '普通',
-  fine: '优秀',
-  rare: '稀有',
-  epic: '史诗',
-  legendary: '传说',
-};
-
-/** 升到 level+1 所需经验：20 × level^1.5 */
+/** 升到 level+1 所需经验：20 × level^1.5（攒满后需花钱进行升级仪式） */
 export function expToNext(level: number): number {
   return Math.round(20 * Math.pow(level, 1.5));
 }
 
-/** 训练场提供的冒险者等级上限 */
-export function adventurerLevelCap(trainingGroundLevel: number): number {
-  return 10 + trainingGroundLevel * 5;
+/** 冒险者等级上限（D&D 制固定 10 级；训练场只加属性不再抬上限） */
+export function adventurerLevelCap(_trainingGroundLevel: number): number {
+  void _trainingGroundLevel;
+  return LEVEL_CAP;
 }
 
 /** 全局菜肴 buff：同属性多道取最强 */
@@ -52,15 +47,15 @@ export function alivePartyClasses(state: GameState): ClassId[] {
 }
 
 /**
- * 结算后的最终属性 = 职业基础 + 种族修正 + 等级成长
- * × 稀有度 × 训练场 × 忠诚度 × 菜肴 buff × 羁绊（编队） × 诗人光环（编队）
+ * 结算后的最终属性 = (职业基础 + 种族修正 + 等级成长)
+ * × 训练场 × 忠诚度 × 菜肴 buff × 羁绊（编队） × 诗人光环（编队）
+ * D&D 制：等级本身即强度（perLevel 成长承担原稀有度乘区的分档作用）。
  * Math.round 而非 floor：低数值时保证加成可感知。
  */
 export function getAdventurerStats(state: GameState, adv: AdventurerState): BaseStats {
   const cls = CLASSES[adv.classId];
   const race = RACES[adv.race] ?? RACES.human;
   const lv = adv.level;
-  const rarityMult = RARITY_MULT[adv.rarity];
   const trainMult = 1 + state.tavern.trainingGround * 0.08;
   const loyaltyMult = 1 + (adv.loyalty / 100) * BALANCE.LOYALTY_STAT_BONUS;
 
@@ -87,7 +82,6 @@ export function getAdventurerStats(state: GameState, adv: AdventurerState): Base
       1,
       Math.round(
         (base + raceMod + per * (lv - 1)) *
-          rarityMult *
           trainMult *
           loyaltyMult *
           dishBuffMult(state, stat) *

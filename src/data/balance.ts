@@ -1,4 +1,6 @@
 /** 全局平衡常数 —— 数值调整只改这里，不碰引擎逻辑 */
+import type { MaterialId } from '../engine/types';
+
 export const BALANCE = {
   /** 模拟步长（秒）。战斗 1 tick = 1 回合 */
   TICK_S: 1,
@@ -12,11 +14,19 @@ export const BALANCE = {
   REST_AFTER_WIPE_S: 120,
   /** 波次间休整秒数 */
   WAVE_REST_S: 3,
+  /** 每波出 BOSS 的概率（纯随机；期望约 20 波一遇） */
+  BOSS_CHANCE: 0.05,
+  /** 普通波魔物数量区间 */
+  WAVE_SIZE_MIN: 2,
+  WAVE_SIZE_MAX: 4,
+  /** BOSS 波附带的护卫数量区间 */
+  BOSS_GUARD_MIN: 1,
+  BOSS_GUARD_MAX: 2,
   /** 清波后按最大生命比例回血（存活者） */
   HEAL_ON_WAVE_CLEAR: 0.2,
   /** 清波后阵亡者按最大生命比例复活 */
   REVIVE_ON_WAVE_CLEAR: 0.3,
-  /** 升级时按最大生命比例回血 */
+  /** 升级仪式完成时按最大生命比例回血 */
   HEAL_ON_LEVEL_UP: 0.25,
   /** 用餐（菜肴生效）获得的忠诚度 */
   LOYALTY_PER_MEAL: 8,
@@ -51,13 +61,53 @@ export const BALANCE = {
   /** 每批基础人数；+ floor(招待区/2) */
   VISIT_BATCH_BASE: 2,
 
-  // ── 经济 ─────────────────────────────
-  /** 每日日薪（按稀有度：普通/优秀/稀有/史诗/传说） */
-  WAGE_PER_RARITY: [5, 15, 40, 120, 350],
-  /** 签约金币（按稀有度） */
-  SIGN_COST_GOLD: [50, 150, 400, 1200, 3500],
+  // ── 经济（D&D 等级制） ───────────────
   DAY_MS: 86_400_000,
 } as const;
+
+/** 日薪 = 2 × 等级²（Lv1=2，Lv5=50，Lv10=200） */
+export function wageOfLevel(level: number): number {
+  return 2 * level * level;
+}
+
+/** 签约金币 = 30 × 等级²（Lv1=30，Lv5=750，Lv10=3000） */
+export function signCostOfLevel(level: number): number {
+  return 30 * level * level;
+}
+
+/** 签约基准材料（按等级分档，高等级雇佣 = 硬通货） */
+export function signMaterialOfLevel(level: number): { materialId: MaterialId; count: number } {
+  if (level <= 3) return { materialId: 'mat_carapace', count: 2 + level };
+  if (level <= 6) return { materialId: 'mat_mithril', count: level - 2 };
+  if (level <= 8) return { materialId: 'mat_core', count: level - 5 };
+  return { materialId: 'mat_core', count: level - 6 };
+}
+
+/**
+ * 到访冒险者的等级权重（Lv1~10）。
+ * 高等级极稀有（D&D 风味：高等级人物整个世界屈指可数）；
+ * 声望每点给高等级温和加权，但不改变量级。
+ */
+export function visitorLevelWeights(reputation: number): number[] {
+  const base = [30, 24, 17, 11, 7, 4, 2, 0.9, 0.35, 0.12];
+  return base.map((w, i) => w * (1 + reputation * 0.004 * i));
+}
+
+/**
+ * 升级仪式费用（经验攒满后仍需支付：金币 + 材料）。
+ * 索引 = 当前等级 - 1（即 [0] = Lv1→2 的费用）。
+ */
+export const LEVEL_UP_COST: Array<{ gold: number; materials: Partial<Record<MaterialId, number>> }> = [
+  { gold: 80, materials: { mat_gel: 10 } },
+  { gold: 150, materials: { mat_carapace: 8 } },
+  { gold: 300, materials: { mat_mushroom_cap: 10 } },
+  { gold: 600, materials: { mat_mithril: 3 } },
+  { gold: 1000, materials: { mat_mithril: 6 } },
+  { gold: 1600, materials: { mat_core: 2 } },
+  { gold: 2500, materials: { mat_core: 3, mat_mithril: 8 } },
+  { gold: 4000, materials: { mat_void_essence: 3 } },
+  { gold: 6500, materials: { mat_void_essence: 6, mat_core: 5 } },
+];
 
 /** 生效中的同属性菜肴 buff 上限 = 1 + 厨房等级（0~4 → 1~5 道） */
 export function kitchenBuffSlots(kitchenLevel: number): number {
@@ -87,5 +137,5 @@ export function visitBatchSize(loungeLevel: number): number {
 /** 菜谱解锁条件（数据文件中声明，引擎统一判定） */
 export type RecipeUnlock =
   | { type: 'initial' }
-  | { type: 'floorClear'; floor: number }
+  | { type: 'mapClear'; map: number }
   | { type: 'reputation'; value: number };

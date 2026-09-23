@@ -3,6 +3,7 @@ const TABS = [
   { id: 'party', label: '冒险者', icon: '🧑‍🤝‍🧑' },
   { id: 'kitchen', label: '厨房', icon: '🍳' },
   { id: 'tavern', label: '酒馆', icon: '🍺' },
+  { id: 'codex', label: '图鉴', icon: '📖' },
 ] as const;
 
 export type TabId = (typeof TABS)[number]['id'];

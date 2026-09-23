@@ -3,9 +3,13 @@ import { Application, Assets, Container, Graphics, Sprite, Text, Texture, Tiling
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
 import { MONSTERS } from '../data/monsters';
-import { CLASS_SPRITES, MONSTER_SPRITES, TILE_SPRITES } from '../data/sprites';
+import { MAPS, MAP_DEFS } from '../data/monsters';
+import { CLASS_SPRITES, MONSTER_SPRITES } from '../data/sprites';
 import { getPartyMembers } from '../engine/party';
 import type { ClassId, EventRecord, GameState, MonsterId } from '../engine/types';
+
+/** 6 张主题地图的地板贴图清单（与 MAP_DEFS 顺序一致） */
+const MAP_DEFS_FLOOR_SPRITES = MAP_DEFS.map((m) => m.floorSprite);
 
 const VIEW_H = 190;
 const SPRITE_SCALE = 3;
@@ -44,11 +48,14 @@ export function BattleViewport() {
 
     let destroyed = false;
     const app = new Application();
-    const loadedTiles: { floor: Texture | null } = { floor: null };
+    /** 6 张主题地图的地板纹理（按 MAP_DEFS 顺序） */
+    const floorTextures: Array<Texture | null> = [];
     const textureCache = new Map<MonsterId, Texture>();
     const classTextureCache = new Map<ClassId, Texture>();
     let floorLayer: TilingSprite | null = null;
     let dimLayer: Graphics | null = null;
+    /** 当前背景地图签名（切图时换纹理 + tint） */
+    let mapSignature = '';
     const partyUnits = new Map<string, Unit>();
     const monsterUnits = new Map<number, Unit>();
     const queue: EventRecord[] = [];
@@ -258,10 +265,7 @@ export function BattleViewport() {
         }
         case 'waveStart':
           buildMonsters(e.monsters, true);
-          showBanner(
-            e.isBoss ? '👑 BOSS 战！' : `第 ${e.wave}/${e.waveCount} 波`,
-            e.isBoss ? '#ff8a80' : '#f0d78c',
-          );
+          showBanner(e.isBoss ? '👑 BOSS 战！' : `第 ${e.wave} 波`, e.isBoss ? '#ff8a80' : '#f0d78c');
           break;
         case 'waveClear':
           showBanner(e.isBoss ? '👑 层底 BOSS 肃清！' : `第 ${e.wave} 波肃清 ✅`, '#9ccc65');
@@ -299,7 +303,7 @@ export function BattleViewport() {
         const urls = [
           ...monsterEntries.map(([, file]) => `/sprites/monsters/${file}`),
           ...classEntries.map(([, file]) => `/sprites/classes/${file}`),
-          `/sprites/tiles/${TILE_SPRITES.floor}`,
+          ...MAP_DEFS_FLOOR_SPRITES.map((file) => `/sprites/tiles/${file}`),
         ];
         const textures = await Assets.load(urls);
         for (const [id, file] of monsterEntries) {
@@ -316,9 +320,11 @@ export function BattleViewport() {
             classTextureCache.set(id, tex);
           }
         }
-        const floorTex = textures[`/sprites/tiles/${TILE_SPRITES.floor}`];
-        if (floorTex) floorTex.source.scaleMode = 'nearest';
-        loadedTiles.floor = floorTex ?? null;
+        for (const file of MAP_DEFS_FLOOR_SPRITES) {
+          const tex = textures[`/sprites/tiles/${file}`];
+          if (tex) tex.source.scaleMode = 'nearest';
+          floorTextures.push(tex ?? null);
+        }
       } catch {
         /* emoji /纯色 回退 */
       }
@@ -342,18 +348,39 @@ export function BattleViewport() {
       host.appendChild(app.canvas);
       ro.observe(host);
 
-      // 地牢背景：地板平铺 + 压暗层（保可读性）
+      // 地牢背景：按当前地图主题平铺地板 + tint + 压暗层（保可读性）
+      const applyMapTheme = (state: GameState): void => {
+        const sig = `${state.dungeon.activeMap}`;
+        if (sig === mapSignature) return;
+        mapSignature = sig;
+        const mapDef = MAPS[state.dungeon.mapId] ?? MAPS[`map_${state.dungeon.activeMap}`];
+        const tex = floorTextures[(mapDef?.number ?? 1) - 1] ?? null;
+        if (!tex) {
+          if (floorLayer) {
+            floorLayer.destroy();
+            floorLayer = null;
+          }
+          return;
+        }
+        const w = Math.max(240, host.clientWidth);
+        if (floorLayer) {
+          floorLayer.texture = tex;
+          floorLayer.width = w;
+          floorLayer.tint = mapDef.floorTint;
+        } else {
+          floorLayer = new TilingSprite({ texture: tex, width: w, height: VIEW_H });
+          floorLayer.tileScale.set(2);
+          floorLayer.tint = mapDef.floorTint;
+          app.stage.addChildAt(floorLayer, 0);
+        }
+      };
       const initW = Math.max(240, host.clientWidth);
-      if (loadedTiles.floor) {
-        floorLayer = new TilingSprite({ texture: loadedTiles.floor, width: initW, height: VIEW_H });
-        floorLayer.tileScale.set(2);
-        app.stage.addChild(floorLayer);
-      }
       dimLayer = new Graphics().rect(0, 0, initW, VIEW_H).fill({ color: 0x141009, alpha: 0.4 });
       app.stage.addChild(dimLayer);
 
       // 初始同步：跳过历史积压，从当前战斗状态直接开始
       const state0 = useGameStore.getState().state;
+      applyMapTheme(state0);
       layoutParty(state0);
       buildMonsters(
         state0.dungeon.monsters.filter((m) => m.hp > 0).map((m) => ({ uid: m.uid, monsterId: m.monsterId })),
@@ -396,8 +423,9 @@ export function BattleViewport() {
           if (e) playEvent(e);
         }
 
-        // 编队/存活同步（每帧，签名变更才重建）
+        // 编队/存活同步（每帧，签名变更才重建）+ 地图主题同步
         layoutParty(state);
+        applyMapTheme(state);
       });
     })();
 

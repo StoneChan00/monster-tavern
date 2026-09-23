@@ -7,42 +7,55 @@ import {
   ROGUE_CRIT,
 } from '../data/classes';
 import { MATERIALS } from '../data/materials';
-import { FLOOR_DEFS, FLOORS, MONSTERS } from '../data/monsters';
+import { MAPS, MAP_DEFS, MONSTERS } from '../data/monsters';
 import { getPartyMembers, type PartyMember } from './party';
 import { rollDropsWithBonus, scaledGain } from './drops';
 import { pushEvent, pushLog } from './log';
 import {
-  adventurerLevelCap,
   expToNext,
   getAdventurerStats,
   getPartyDropMult,
   getPartyExpMult,
 } from './stats';
 import type { GameState, MonsterInstance } from './types';
+import { LEVEL_CAP } from './types';
 
 /** 魔物索敌顺序：前排（槽位 0/3）→ 中排（1/4）→ 后排（2） */
 const TARGET_ORDER = [0, 3, 1, 4, 2];
 
-/** 生成当前波次魔物 */
-export function spawnWave(state: GameState): void {
-  const floor = FLOORS[state.dungeon.floorId];
-  const wave = floor.waves[state.dungeon.waveIndex];
-  state.dungeon.monsters = wave.monsters.map((mid) => {
+/**
+ * 生成下一波（地图制无限循环）：
+ * 95% → 普通波：从本图魔物池随机抽 2~4 只；
+ * 5%  → BOSS 波：从 BOSS 池随机抽 1 只 + 1~2 只护卫。
+ */
+export function spawnWave(state: GameState, rng: () => number = Math.random): void {
+  const map = MAPS[state.dungeon.mapId];
+  const isBoss = rng() < BALANCE.BOSS_CHANCE;
+  const pickFrom = (pool: string[]): string => pool[Math.floor(rng() * pool.length)];
+  let mids: string[];
+  if (isBoss) {
+    const guards = BALANCE.BOSS_GUARD_MIN + Math.floor(rng() * (BALANCE.BOSS_GUARD_MAX - BALANCE.BOSS_GUARD_MIN + 1));
+    mids = [pickFrom(map.bossPool)];
+    for (let i = 0; i < guards; i++) mids.push(pickFrom(map.monsterPool));
+  } else {
+    const count = BALANCE.WAVE_SIZE_MIN + Math.floor(rng() * (BALANCE.WAVE_SIZE_MAX - BALANCE.WAVE_SIZE_MIN + 1));
+    mids = Array.from({ length: count }, () => pickFrom(map.monsterPool));
+  }
+  state.dungeon.monsters = mids.map((mid) => {
     const def = MONSTERS[mid];
     return { uid: state.meta.nextUid++, monsterId: mid, hp: def.base.hp, maxHp: def.base.hp };
   });
   state.dungeon.status = 'combat';
   pushEvent(state, {
     kind: 'waveStart',
-    wave: state.dungeon.waveIndex + 1,
-    waveCount: floor.waves.length,
-    isBoss: wave.isBoss ?? false,
+    wave: state.dungeon.waveCount + 1,
+    isBoss,
     monsters: state.dungeon.monsters.map((m) => ({ uid: m.uid, monsterId: m.monsterId })),
   });
   pushLog(
     state,
     'combat',
-    `${floor.icon} ${floor.name} · 第 ${state.dungeon.waveIndex + 1}/${floor.waves.length} 波遭遇 ${wave.monsters.length} 只魔物`,
+    `${map.icon} ${map.name} · 第 ${state.dungeon.waveCount + 1} 波遭遇 ${mids.length} 只魔物${isBoss ? '（BOSS 气?!）' : ''}`,
   );
 }
 
@@ -64,27 +77,19 @@ function rollDamage(
 function gainExp(state: GameState, advId: string, baseExp: number, mult: number, rng: () => number): void {
   const adv = state.roster.find((a) => a.id === advId);
   if (!adv) return;
-  const cap = adventurerLevelCap(state.tavern.trainingGround);
   const gained = scaledGain(baseExp, mult, rng);
   if (gained > 0) state.meta.lifetimeExpEarned += gained;
-  if (adv.level >= cap) return;
-  adv.exp += gained;
-  let need = expToNext(adv.level);
-  while (adv.exp >= need && adv.level < cap) {
-    adv.exp -= need;
-    adv.level += 1;
-    const maxHp = getAdventurerStats(state, adv).hp;
-    adv.hp = Math.min(maxHp, adv.hp + Math.ceil(maxHp * BALANCE.HEAL_ON_LEVEL_UP));
-    pushEvent(state, { kind: 'levelup', targetId: adv.id, level: adv.level });
-    pushLog(state, 'level', `🎉 ${adv.name} 升到了 Lv.${adv.level}！`);
-    need = expToNext(adv.level);
-  }
-  if (adv.level >= cap) adv.exp = 0;
+  // D&D 制：经验攒满即停（不自动升级）——升级需经验满 + 金币/材料的「升级仪式」
+  if (adv.level >= LEVEL_CAP) return;
+  const need = expToNext(adv.level);
+  adv.exp = Math.min(need, adv.exp + gained);
 }
 
 function onMonsterKilled(state: GameState, target: MonsterInstance, offlineMult: number, rng: () => number): void {
   const def = MONSTERS[target.monsterId];
   pushEvent(state, { kind: 'death', side: 'monster', targetUid: target.uid, targetMonsterId: target.monsterId });
+  // 图鉴：该种魔物累计击杀 +1（键存在 = 已发现）
+  state.meta.monsterKills[target.monsterId] = (state.meta.monsterKills[target.monsterId] ?? 0) + 1;
   const expMult = offlineMult * getPartyExpMult(state);
   for (const m of getPartyMembers(state)) {
     gainExp(state, m.adv.id, def.exp, expMult, rng);
@@ -233,9 +238,11 @@ function memberAct(state: GameState, member: PartyMember, rng: () => number, off
 }
 
 function onWaveCleared(state: GameState): void {
-  const floor = FLOORS[state.dungeon.floorId];
-  const wave = floor.waves[state.dungeon.waveIndex];
+  const map = MAPS[state.dungeon.mapId];
+  // BOSS 波判定：波内首位魔物是否出自 BOSS 池（spawnWave 保证 BOSS 恒在首位）
+  const isBossWave = map.bossPool.includes(state.dungeon.monsters[0]?.monsterId ?? '');
   state.meta.totalWavesCleared += 1;
+  state.dungeon.waveCount += 1;
 
   // 存活者回血，阵亡者复活
   for (const m of getPartyMembers(state)) {
@@ -247,23 +254,24 @@ function onWaveCleared(state: GameState): void {
     }
   }
 
-  if (wave.isBoss) {
+  if (isBossWave) {
     state.meta.totalBossKills += 1;
-    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveIndex + 1, isBoss: true });
-    if (!state.meta.floorsFirstCleared.includes(floor.id)) {
-      state.meta.floorsFirstCleared.push(floor.id);
-      state.player.reputation += floor.firstClearReputation;
-      const bossName = MONSTERS[wave.monsters[0]]?.name ?? '层底 BOSS';
-      pushLog(state, 'system', `🏆 首次击败 ${bossName}！酒馆声望 +${floor.firstClearReputation}`);
+    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isBoss: true });
+    if (!state.meta.mapsFirstCleared.includes(map.number)) {
+      state.meta.mapsFirstCleared.push(map.number);
+      state.player.reputation += map.firstClearReputation;
+      const bossName = MONSTERS[state.dungeon.monsters[0]?.monsterId]?.name ?? 'BOSS';
+      pushLog(state, 'system', `🏆 首次肃清 ${map.name} 的 ${bossName}！酒馆声望 +${map.firstClearReputation}`);
     }
-    if (floor.number === state.dungeon.highestFloor && floor.number < FLOOR_DEFS.length) {
-      state.dungeon.highestFloor = floor.number + 1;
-      pushLog(state, 'system', `🗺️ 地牢情报更新：解锁 第 ${floor.number + 1} 层！`);
+    // 首杀本图 BOSS → 解锁下一张地图
+    if (map.number === state.dungeon.unlockedMaps && map.number < MAP_DEFS.length) {
+      state.dungeon.unlockedMaps = map.number + 1;
+      pushLog(state, 'system', `🗺️ 地牢情报更新：解锁 ${MAP_DEFS[map.number].name}！`);
     }
-    pushLog(state, 'combat', `👑 层底 BOSS 肃清！队伍在本层开始驻farm循环`);
+    pushLog(state, 'combat', `👑 BOSS 肃清！队伍在本图继续驻farm循环`);
   } else {
-    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveIndex + 1, isBoss: false });
-    pushLog(state, 'combat', `✅ 第 ${state.dungeon.waveIndex + 1}/${floor.waves.length} 波肃清，短暂休整…`);
+    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isBoss: false });
+    pushLog(state, 'combat', `✅ 第 ${state.dungeon.waveCount} 波肃清，短暂休整…`);
   }
   state.dungeon.status = 'waveRest';
   state.dungeon.restRemainingS = BALANCE.WAVE_REST_S;
@@ -273,7 +281,6 @@ function onWiped(state: GameState): void {
   const restS = Math.ceil(BALANCE.REST_AFTER_WIPE_S * dormRestMult(state.tavern.dorm));
   state.dungeon.status = 'resting';
   state.dungeon.restRemainingS = restS;
-  state.dungeon.waveIndex = 0;
   pushEvent(state, { kind: 'wipe' });
   pushLog(state, 'combat', `💔 队伍全灭……全员被抬回酒馆休整（约 ${restS} 秒后重返）`);
 }

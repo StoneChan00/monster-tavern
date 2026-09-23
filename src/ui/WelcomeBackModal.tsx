@@ -39,9 +39,6 @@ export function WelcomeBackModal() {
                 highlight={report.gold < 0 ? false : true}
               />
               <Row label="⭐ 经验" value={`+${fmtNum(report.exp)}`} />
-              {report.levelsGained > 0 ? (
-                <Row label="🎉 全队等级" value={`+${report.levelsGained} 级`} highlight />
-              ) : null}
               <Row label="🌊 清波" value={`+${report.wavesCleared}`} />
               {report.bossKills > 0 ? (
                 <Row label="👑 BOSS 击杀" value={`+${report.bossKills}`} highlight />

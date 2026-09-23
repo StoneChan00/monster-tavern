@@ -75,7 +75,10 @@ export function KitchenPanel() {
 
 function unlockText(recipe: RecipeDef): string {
   if (recipe.unlock.type === 'initial') return '';
-  if (recipe.unlock.type === 'floorClear') return `通关第 ${recipe.unlock.floor} 层解锁`;
+  if (recipe.unlock.type === 'mapClear') {
+    const names = ['苔藓洞窟', '秘银矿道', '骸骨墓穴', '熔岩裂隙', '水晶回廊', '虚空终焉'];
+    return `首杀${names[recipe.unlock.map - 1] ?? `图${recipe.unlock.map}`}（图${recipe.unlock.map}）BOSS 解锁`;
+  }
   return `声望 ${recipe.unlock.value} 解锁`;
 }
 

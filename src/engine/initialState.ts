@@ -1,9 +1,8 @@
 import { BALANCE } from '../data/balance';
 import { STARTER_ADVENTURER } from '../data/classes';
-import { FLOOR_DEFS } from '../data/monsters';
+import { MAP_DEFS } from '../data/monsters';
 import { initialUnlockedRecipes } from '../data/recipes';
-import { spawnWave } from './combat';
-import { getAdventurerStats } from './stats';
+import { getAdventurerStats } from '../engine/stats';
 import { pushLog } from './log';
 import { SAVE_VERSION } from './types';
 import type { GameState } from './types';
@@ -21,7 +20,9 @@ export function createInitialState(now: number = Date.now()): GameState {
       lifetimeExpEarned: 0,
       totalWavesCleared: 0,
       totalBossKills: 0,
-      floorsFirstCleared: [],
+      mapsFirstCleared: [],
+      monsterKills: {},
+      dishesCooked: 0,
     },
     player: { gold: 60, reputation: 0 },
     roster: [
@@ -48,21 +49,20 @@ export function createInitialState(now: number = Date.now()): GameState {
     },
     tavern: { trainingGround: 0, lounge: 0, kitchen: 0, dorm: 0, intel: 0 },
     dungeon: {
-      floorId: FLOOR_DEFS[0].id,
-      waveIndex: 0,
-      status: 'combat',
-      restRemainingS: 0,
+      mapId: MAP_DEFS[0].id,
+      status: 'waveRest',
+      restRemainingS: 1, // 1 秒后生成首波（spawnWave 需 rng，交给 tick 循环）
       monsters: [],
-      highestFloor: 1,
-      farmFloor: 1,
+      unlockedMaps: 1,
+      activeMap: 1,
+      waveCount: 0,
     },
     log: [],
     events: [],
   };
   const hank = state.roster[0];
   hank.hp = getAdventurerStats(state, hank).hp;
-  spawnWave(state);
-  pushLog(state, 'system', `🍺 ${STARTER_ADVENTURER.name} 在酒馆签下契约，向 ${FLOOR_DEFS[0].name} 进发！`);
+  pushLog(state, 'system', `🍺 ${STARTER_ADVENTURER.name} 在酒馆签下契约，向 ${MAP_DEFS[0].name} 进发！`);
   pushLog(state, 'system', '🍽️ 飘香的饭菜会吸引冒险者到访——记得解锁菜谱、升级厨房！');
   return state;
 }

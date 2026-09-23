@@ -1,5 +1,5 @@
 import { Panel } from './Panel';
-import { AdventurerCard, RARITY_COLOR } from './AdventurerCard';
+import { AdventurerCard } from './AdventurerCard';
 import { RecruitPanel } from './RecruitPanel';
 import { Bar } from './Bar';
 import { CharacterSprite } from './CharacterSprite';
@@ -8,7 +8,7 @@ import { BALANCE } from '../data/balance';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
 import { isSlotUnlocked } from '../engine/party';
-import { getAdventurerStats, RARITY_LABEL } from '../engine/stats';
+import { getAdventurerStats, levelTier } from '../engine/stats';
 import type { GameState } from '../engine/types';
 
 const ROWS: Array<{ label: string; icon: string; slots: number[] }> = [
@@ -89,13 +89,12 @@ function SlotContent({ slot, state }: { slot: number; state: GameState }) {
         <div>
           <div className="flex items-center gap-1.5 text-xs">
             <CharacterSprite classId={adv.classId} size={18} />
-            <span className="truncate font-bold" style={{ color: RARITY_COLOR[adv.rarity] }}>
+            <span className="truncate font-bold" style={{ color: levelTier(adv.level).color }}>
               {adv.name}
             </span>
             <span className="ml-auto shrink-0 text-[10px] text-[#a89880]">
               {RACES[adv.race]?.name ?? '人类'} · {CLASSES[adv.classId].name} ·{' '}
-              <span style={{ color: RARITY_COLOR[adv.rarity] }}>{RARITY_LABEL[adv.rarity]}</span> ·
-              Lv{adv.level}
+              <span style={{ color: levelTier(adv.level).color }}>Lv{adv.level}</span>
             </span>
           </div>
           <Bar

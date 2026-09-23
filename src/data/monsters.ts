@@ -1,4 +1,4 @@
-import type { BaseStats, FloorId, MaterialId, MonsterId } from '../engine/types';
+import type { BaseStats, MapId, MaterialId, MonsterId } from '../engine/types';
 
 export interface MonsterDef {
   id: MonsterId;
@@ -452,127 +452,92 @@ export const MONSTERS: Record<MonsterId, MonsterDef> = Object.fromEntries(
   ].map((m) => [m.id, m]),
 );
 
-export interface WaveDef {
-  monsters: MonsterId[];
-  isBoss?: boolean;
-}
-
-export interface FloorDef {
-  id: FloorId;
-  /** 层数（1~20） */
+export interface MapDef {
+  id: MapId;
+  /** 地图编号（1~6） */
   number: number;
   name: string;
   icon: string;
-  waves: WaveDef[];
-  /** 首杀层底 BOSS 获得的声望 */
+  /** 常规魔物池（随机组波，可重复出现） */
+  monsterPool: MonsterId[];
+  /** BOSS 池（每波 5% 概率随机抽一只，附 1~2 只小弟） */
+  bossPool: MonsterId[];
+  /** 首杀本图 BOSS 获得的声望 */
   firstClearReputation: number;
+  /** 主题地板贴图（public/sprites/tiles/ 下文件名） */
+  floorSprite: string;
+  /** PixiJS tint 主题色（叠加在地板贴图上做主题差异） */
+  floorTint: number;
 }
 
-/** 楼层 ID 规则：floor_<number> */
-export function floorIdOf(number: number): FloorId {
-  return `floor_${number}`;
-}
-
-const W = (...monsters: MonsterId[]): WaveDef => ({ monsters });
-
-export const FLOOR_DEFS: FloorDef[] = [
+/**
+ * 地图体系（v5）：6 张主题地图替代原 20 层地牢。
+ * 探索为无限循环——随机组波、5% 概率 BOSS 波；首杀本图 BOSS 解锁下一张。
+ * 魔物池继承原楼层分布（1-4 层→图1，5-6→图2，7→图3，8-10→图4，11-15→图5，16-20→图6）。
+ */
+export const MAP_DEFS: MapDef[] = [
   {
-    id: 'floor_1', number: 1, name: '苔藓洞窟 · 第 1 层', icon: '🕳️', firstClearReputation: 5,
-    waves: [W('slime', 'slime'), W('slime', 'slime', 'bat'), W('bat', 'bat', 'mushroom'), W('mushroom', 'mushroom', 'slime', 'slime'), { monsters: ['slime_king'], isBoss: true }],
+    id: 'map_1', number: 1, name: '苔藓洞窟', icon: '🕳️',
+    monsterPool: ['slime', 'bat', 'mushroom', 'big_slime', 'venom_bat', 'rock_crab', 'spore_mushroom', 'moss_wolf', 'cave_lizard'],
+    bossPool: ['slime_king', 'bat_lord', 'crab_king', 'wolf_alpha'],
+    firstClearReputation: 5,
+    floorSprite: 'floor_mossy.png', floorTint: 0xb8d8b8,
   },
   {
-    id: 'floor_2', number: 2, name: '苔藓洞窟 · 第 2 层', icon: '🕳️', firstClearReputation: 8,
-    waves: [W('big_slime', 'big_slime'), W('big_slime', 'venom_bat', 'venom_bat'), W('venom_bat', 'venom_bat', 'mushroom'), W('big_slime', 'big_slime', 'venom_bat'), { monsters: ['bat_lord'], isBoss: true }],
+    id: 'map_2', number: 2, name: '秘银矿道', icon: '⛏️',
+    monsterPool: ['glow_jelly', 'stone_golem', 'shadow_spider', 'iron_beetle', 'moss_wolf', 'cave_lizard', 'rock_crab'],
+    bossPool: ['golem_guard', 'weaver_queen'],
+    firstClearReputation: 20,
+    floorSprite: 'floor_mine.png', floorTint: 0xa8c4e0,
   },
   {
-    id: 'floor_3', number: 3, name: '苔藓洞窟 · 第 3 层', icon: '🕳️', firstClearReputation: 12,
-    waves: [W('rock_crab', 'rock_crab'), W('rock_crab', 'spore_mushroom'), W('spore_mushroom', 'spore_mushroom', 'bat'), W('rock_crab', 'rock_crab', 'spore_mushroom'), { monsters: ['crab_king'], isBoss: true }],
+    id: 'map_3', number: 3, name: '骸骨墓穴', icon: '💀',
+    monsterPool: ['skeleton', 'man_eater', 'shadow_spider', 'iron_beetle', 'spore_mushroom'],
+    bossPool: ['skeleton_captain'],
+    firstClearReputation: 30,
+    floorSprite: 'floor_crypt.png', floorTint: 0xb0a8c8,
   },
   {
-    id: 'floor_4', number: 4, name: '苔藓洞窟 · 第 4 层', icon: '🌿', firstClearReputation: 16,
-    waves: [W('moss_wolf', 'moss_wolf'), W('moss_wolf', 'moss_wolf', 'cave_lizard'), W('cave_lizard', 'cave_lizard', 'rock_crab'), W('moss_wolf', 'moss_wolf', 'cave_lizard'), { monsters: ['wolf_alpha'], isBoss: true }],
+    id: 'map_4', number: 4, name: '熔岩裂隙', icon: '🔥',
+    monsterPool: ['acid_slime', 'cave_troll', 'wraith', 'basilisk', 'shadow_hunter', 'abyss_tentacle', 'obsidian_golem'],
+    bossPool: ['troll_warlord', 'wraith_lord', 'nightmare'],
+    firstClearReputation: 42,
+    floorSprite: 'floor_lava.png', floorTint: 0xe0a888,
   },
   {
-    id: 'floor_5', number: 5, name: '秘银矿道 · 第 5 层', icon: '⛏️', firstClearReputation: 20,
-    waves: [W('glow_jelly', 'glow_jelly'), W('glow_jelly', 'stone_golem'), W('stone_golem', 'glow_jelly', 'glow_jelly'), W('stone_golem', 'stone_golem', 'moss_wolf'), { monsters: ['golem_guard'], isBoss: true }],
+    id: 'map_5', number: 5, name: '水晶回廊', icon: '💠',
+    monsterPool: ['crystal_slime', 'crystal_bat', 'void_spider', 'ice_lizard', 'gem_golem', 'amethyst_beetle', 'wraith'],
+    bossPool: ['crystal_mother', 'gem_titan', 'void_weaver', 'frost_basilisk', 'crystal_beetle_king'],
+    firstClearReputation: 60,
+    floorSprite: 'floor_crystal.png', floorTint: 0x98d8e8,
   },
   {
-    id: 'floor_6', number: 6, name: '暗影回廊 · 第 6 层', icon: '🕸️', firstClearReputation: 25,
-    waves: [W('shadow_spider', 'shadow_spider'), W('shadow_spider', 'iron_beetle'), W('iron_beetle', 'iron_beetle', 'shadow_spider'), W('shadow_spider', 'shadow_spider', 'iron_beetle'), { monsters: ['weaver_queen'], isBoss: true }],
-  },
-  {
-    id: 'floor_7', number: 7, name: '骸骨墓穴 · 第 7 层', icon: '💀', firstClearReputation: 30,
-    waves: [W('skeleton', 'skeleton'), W('man_eater', 'skeleton'), W('man_eater', 'man_eater', 'shadow_spider'), W('skeleton', 'skeleton', 'man_eater'), { monsters: ['skeleton_captain'], isBoss: true }],
-  },
-  {
-    id: 'floor_8', number: 8, name: '熔岩裂隙 · 第 8 层', icon: '🔥', firstClearReputation: 36,
-    waves: [W('acid_slime', 'acid_slime'), W('cave_troll', 'acid_slime'), W('cave_troll', 'cave_troll', 'iron_beetle'), W('cave_troll', 'acid_slime', 'acid_slime'), { monsters: ['troll_warlord'], isBoss: true }],
-  },
-  {
-    id: 'floor_9', number: 9, name: '幽魂深渊 · 第 9 层', icon: '👻', firstClearReputation: 42,
-    waves: [W('wraith', 'wraith'), W('basilisk', 'shadow_hunter'), W('wraith', 'basilisk', 'shadow_hunter'), W('shadow_hunter', 'basilisk', 'wraith'), { monsters: ['wraith_lord'], isBoss: true }],
-  },
-  {
-    id: 'floor_10', number: 10, name: '深渊之心 · 第 10 层', icon: '🌌', firstClearReputation: 50,
-    waves: [W('abyss_tentacle', 'abyss_tentacle'), W('obsidian_golem', 'abyss_tentacle'), W('obsidian_golem', 'obsidian_golem', 'wraith'), W('abyss_tentacle', 'abyss_tentacle', 'obsidian_golem'), { monsters: ['nightmare'], isBoss: true }],
-  },
-  {
-    id: 'floor_11', number: 11, name: '水晶回廊 · 第 11 层', icon: '💠', firstClearReputation: 55,
-    waves: [W('crystal_slime', 'crystal_bat'), W('crystal_slime', 'crystal_slime', 'crystal_bat'), W('crystal_bat', 'crystal_bat', 'void_spider'), W('crystal_slime', 'crystal_bat', 'crystal_bat'), { monsters: ['crystal_mother'], isBoss: true }],
-  },
-  {
-    id: 'floor_12', number: 12, name: '水晶回廊 · 第 12 层', icon: '💠', firstClearReputation: 60,
-    waves: [W('gem_golem', 'gem_golem'), W('gem_golem', 'crystal_slime', 'crystal_bat'), W('crystal_bat', 'gem_golem', 'void_spider'), W('gem_golem', 'gem_golem', 'crystal_slime'), { monsters: ['gem_titan'], isBoss: true }],
-  },
-  {
-    id: 'floor_13', number: 13, name: '水晶回廊 · 第 13 层', icon: '💠', firstClearReputation: 66,
-    waves: [W('void_spider', 'void_spider'), W('ice_lizard', 'void_spider'), W('ice_lizard', 'ice_lizard', 'crystal_bat'), W('void_spider', 'void_spider', 'ice_lizard'), { monsters: ['void_weaver'], isBoss: true }],
-  },
-  {
-    id: 'floor_14', number: 14, name: '水晶回廊 · 第 14 层', icon: '💠', firstClearReputation: 72,
-    waves: [W('ice_lizard', 'ice_lizard'), W('amethyst_beetle', 'ice_lizard'), W('amethyst_beetle', 'amethyst_beetle', 'void_spider'), W('ice_lizard', 'amethyst_beetle', 'ice_lizard'), { monsters: ['frost_basilisk'], isBoss: true }],
-  },
-  {
-    id: 'floor_15', number: 15, name: '水晶回廊 · 第 15 层', icon: '💠', firstClearReputation: 78,
-    waves: [W('amethyst_beetle', 'amethyst_beetle'), W('amethyst_beetle', 'gem_golem', 'ice_lizard'), W('gem_golem', 'gem_golem', 'void_spider'), W('amethyst_beetle', 'amethyst_beetle', 'gem_golem'), { monsters: ['crystal_beetle_king'], isBoss: true }],
-  },
-  {
-    id: 'floor_16', number: 16, name: '虚空裂隙 · 第 16 层', icon: '🕳️', firstClearReputation: 85,
-    waves: [W('mind_flayer', 'mind_flayer'), W('mind_flayer', 'void_wraith'), W('void_wraith', 'void_wraith', 'mind_flayer'), W('mind_flayer', 'mind_flayer', 'void_wraith'), { monsters: ['elder_flayer'], isBoss: true }],
-  },
-  {
-    id: 'floor_17', number: 17, name: '虚空裂隙 · 第 17 层', icon: '🕳️', firstClearReputation: 92,
-    waves: [W('void_wraith', 'void_wraith'), W('purple_worm', 'void_wraith'), W('purple_worm', 'purple_worm', 'mind_flayer'), W('void_wraith', 'void_wraith', 'purple_worm'), { monsters: ['void_reaper'], isBoss: true }],
-  },
-  {
-    id: 'floor_18', number: 18, name: '虚空裂隙 · 第 18 层', icon: '🕳️', firstClearReputation: 100,
-    waves: [W('purple_worm', 'purple_worm'), W('nightmare_shade', 'purple_worm'), W('nightmare_shade', 'nightmare_shade', 'purple_worm'), W('purple_worm', 'nightmare_shade', 'purple_worm'), { monsters: ['crystal_dragon'], isBoss: true }],
-  },
-  {
-    id: 'floor_19', number: 19, name: '虚空裂隙 · 第 19 层', icon: '🕳️', firstClearReputation: 108,
-    waves: [W('nightmare_shade', 'nightmare_shade'), W('nightmare_shade', 'void_wraith', 'mind_flayer'), W('void_wraith', 'purple_worm', 'nightmare_shade'), W('nightmare_shade', 'nightmare_shade', 'void_wraith'), { monsters: ['shade_lord'], isBoss: true }],
-  },
-  {
-    id: 'floor_20', number: 20, name: '虚空终焉 · 第 20 层', icon: '🌌', firstClearReputation: 120,
-    waves: [W('void_heart_larva', 'void_heart_larva'), W('void_heart_larva', 'nightmare_shade', 'void_wraith'), W('void_heart_larva', 'void_heart_larva', 'purple_worm'), W('nightmare_shade', 'void_heart_larva', 'void_wraith'), { monsters: ['the_void_heart'], isBoss: true }],
+    id: 'map_6', number: 6, name: '虚空终焉', icon: '🌌',
+    monsterPool: ['mind_flayer', 'void_wraith', 'purple_worm', 'nightmare_shade', 'void_heart_larva'],
+    bossPool: ['elder_flayer', 'void_reaper', 'crystal_dragon', 'shade_lord', 'the_void_heart'],
+    firstClearReputation: 85,
+    floorSprite: 'floor_void.png', floorTint: 0x9888c8,
   },
 ];
 
-export const FLOORS: Record<FloorId, FloorDef> = Object.fromEntries(
-  FLOOR_DEFS.map((f) => [f.id, f]),
+export const MAPS: Record<MapId, MapDef> = Object.fromEntries(
+  MAP_DEFS.map((m) => [m.id, m]),
 );
 
-/** 楼层掉落表汇总（情报网掉落预览用） */
-export function floorDropTable(floorId: FloorId): Array<{ materialId: MaterialId; from: string[] }> {
-  const floor = FLOORS[floorId];
-  const map = new Map<string, Set<string>>();
-  for (const wave of floor.waves) {
-    for (const mid of wave.monsters) {
-      for (const d of MONSTERS[mid].drops) {
-        if (!map.has(d.materialId)) map.set(d.materialId, new Set());
-        map.get(d.materialId)!.add(MONSTERS[mid].name);
-      }
+/** 地图 ID 规则：map_<number> */
+export function mapIdOf(number: number): MapId {
+  return `map_${number}`;
+}
+
+/** 地图掉落表汇总（情报网掉落预览用） */
+export function mapDropTable(mapId: MapId): Array<{ materialId: MaterialId; from: string[] }> {
+  const map = MAPS[mapId];
+  const map_ = new Map<string, Set<string>>();
+  for (const mid of [...map.monsterPool, ...map.bossPool]) {
+    for (const d of MONSTERS[mid].drops) {
+      if (!map_.has(d.materialId)) map_.set(d.materialId, new Set());
+      map_.get(d.materialId)!.add(MONSTERS[mid].name);
     }
   }
-  return [...map.entries()].map(([materialId, from]) => ({ materialId, from: [...from] }));
+  return [...map_.entries()].map(([materialId, from]) => ({ materialId, from: [...from] }));
 }

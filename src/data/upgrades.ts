@@ -19,12 +19,12 @@ export interface FacilityDef {
   cost: (level: number) => UpgradeCost;
 }
 
-/** 训练场：每级 冒险者等级上限 +5、全属性 +8% */
+/** 训练场：每级 全属性 +8%（D&D 制等级上限固定 10，训练只涨属性） */
 export const TRAINING_GROUND: FacilityDef = {
   id: 'trainingGround',
   name: '训练场',
   icon: '🏹',
-  describe: (lv) => `冒险者等级上限 ${10 + lv * 5} · 全属性 +${lv * 8}%`,
+  describe: (lv) => `全队属性 +${lv * 8}%`,
   maxLevel: 5,
   cost: (lv) => ({
     gold: [50, 120, 300, 750, 1800][lv],
@@ -75,12 +75,12 @@ export const DORM: FacilityDef = {
   }),
 };
 
-/** 情报网：掉落预览可查层数 = 2 + 2×等级 */
+/** 情报网：掉落预览可查地图数 = 1 + 等级 */
 export const INTEL: FacilityDef = {
   id: 'intel',
   name: '情报网',
   icon: '🗺️',
-  describe: (lv) => `可查询 ${2 + lv * 2} 层的魔物与掉落情报`,
+  describe: (lv) => `可查询 ${1 + lv} 张地图的魔物与掉落情报`,
   maxLevel: 4,
   cost: (lv) => ({
     gold: [100, 250, 600, 1500][lv],

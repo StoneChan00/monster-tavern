@@ -1,19 +1,20 @@
 import { create } from 'zustand';
-import { BALANCE, kitchenSpeedMult, rosterCap } from '../data/balance';
+import { BALANCE, LEVEL_UP_COST, kitchenSpeedMult, rosterCap } from '../data/balance';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
 import { RECIPES } from '../data/recipes';
 import { FACILITIES, type FacilityId } from '../data/upgrades';
 import { MATERIALS } from '../data/materials';
-import { FLOORS, floorIdOf } from '../data/monsters';
+import { MAPS, MAP_DEFS, mapIdOf } from '../data/monsters';
 import { applyOffline } from '../engine/offline';
 import { tick as engineTick } from '../engine/tick';
 import { createInitialState } from '../engine/initialState';
-import { pushLog } from '../engine/log';
-import { getAdventurerStats, RARITY_LABEL } from '../engine/stats';
+import { pushLog, pushEvent } from '../engine/log';
+import { getAdventurerStats, expToNext, levelTier } from '../engine/stats';
 import { isSlotUnlocked } from '../engine/party';
 import { deserialize, serialize } from '../save/migrate';
 import { localStorageAdapter, SAVE_KEY } from '../save/adapter';
+import { LEVEL_CAP } from '../engine/types';
 import type { AdventurerState, GameState, OfflineReport, RecipeId } from '../engine/types';
 
 export interface ActionResult {
@@ -33,8 +34,10 @@ interface GameStore {
   upgradeFacility: (facilityId: FacilityId) => ActionResult;
   signVisitor: (uid: number) => ActionResult;
   dismissAdventurer: (adventurerId: string) => ActionResult;
+  /** D&D 升级仪式：经验满 + 金币/材料，手动执行 */
+  levelUpAdventurer: (adventurerId: string) => ActionResult;
   assignToSlot: (slot: number, adventurerId: string | null) => ActionResult;
-  setFarmFloor: (floor: number) => ActionResult;
+  setActiveMap: (mapNumber: number) => ActionResult;
   dismissOfflineReport: () => void;
   saveNow: () => void;
   exportSaveString: () => string;
@@ -214,8 +217,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       name: visitor.name,
       classId: visitor.classId,
       race: visitor.race,
-      rarity: visitor.rarity,
-      level: 1,
+      level: visitor.level,
       exp: 0,
       hp: 1,
       loyalty: 50,
@@ -228,10 +230,11 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     if (slot >= 0) s.party[slot] = adv.id;
 
     const raceName = RACES[visitor.race]?.name ?? '人类';
+    const tier = levelTier(visitor.level);
     pushLog(
       s,
       'system',
-      `✍️ ${visitor.name}（${raceName}·${CLASSES[visitor.classId].name}·${RARITY_LABEL[visitor.rarity]}）签下契约！${slot >= 0 ? '已加入编队' : '在替补席待命'}`,
+      `✍️ ${visitor.name}（${raceName}·${CLASSES[visitor.classId].name}·Lv.${visitor.level} ${tier.label}）签下契约！${slot >= 0 ? '已加入编队' : '在替补席待命'}`,
     );
     set({ state: { ...s } });
     return { ok: true, message: '签约成功' };
@@ -248,6 +251,33 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     pushLog(s, 'system', `👋 ${adv.name} 结清了工钱，与酒馆道别离开。愿风指引他的旅途。`);
     set({ state: { ...s } });
     return { ok: true, message: '已解雇' };
+  },
+
+  levelUpAdventurer: (adventurerId) => {
+    const s = get().state;
+    const adv = s.roster.find((a) => a.id === adventurerId);
+    if (!adv) return { ok: false, message: '冒险者不存在' };
+    if (adv.level >= LEVEL_CAP) return { ok: false, message: '已达 10 级传奇——这个世界没有更强的了' };
+    const need = expToNext(adv.level);
+    if (adv.exp < need) {
+      return { ok: false, message: `历练不足（经验 ${adv.exp}/${need}）` };
+    }
+    const cost = LEVEL_UP_COST[adv.level - 1];
+    if (!cost) return { ok: false, message: '升级费用未定义' };
+    const afford = canAfford(s, { gold: cost.gold, materials: cost.materials });
+    if (!afford.ok) return { ok: false, message: afford.message };
+
+    payCost(s, { gold: cost.gold, materials: cost.materials });
+    adv.level += 1;
+    adv.exp = 0;
+    // 升级仪式：回满一部分状态并播报
+    const maxHp = getAdventurerStats(s, adv).hp;
+    adv.hp = Math.min(maxHp, adv.hp + Math.ceil(maxHp * BALANCE.HEAL_ON_LEVEL_UP));
+    pushEvent(s, { kind: 'levelup', targetId: adv.id, level: adv.level });
+    const tier = levelTier(adv.level);
+    pushLog(s, 'level', `🎉 ${adv.name} 完成升级仪式，达到 Lv.${adv.level}（${tier.label}）！`);
+    set({ state: { ...s } });
+    return { ok: true, message: '升级成功' };
   },
 
   assignToSlot: (slot, adventurerId) => {
@@ -271,22 +301,25 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     return { ok: true, message: '编队已更新' };
   },
 
-  setFarmFloor: (floor) => {
+  setActiveMap: (mapNumber) => {
     const s = get().state;
-    if (!Number.isInteger(floor) || floor < 1 || floor > s.dungeon.highestFloor) {
-      return { ok: false, message: '该层尚未解锁' };
+    if (!Number.isInteger(mapNumber) || mapNumber < 1 || mapNumber > MAP_DEFS.length) {
+      return { ok: false, message: '未知地图' };
     }
-    const floorDef = FLOORS[floorIdOf(floor)];
-    s.dungeon.farmFloor = floor;
-    s.dungeon.floorId = floorDef.id;
-    s.dungeon.waveIndex = 0;
+    if (mapNumber > s.dungeon.unlockedMaps) {
+      return { ok: false, message: '该地图尚未解锁' };
+    }
+    const mapDef = MAPS[mapIdOf(mapNumber)];
+    s.dungeon.activeMap = mapNumber;
+    s.dungeon.mapId = mapDef.id;
+    s.dungeon.waveCount = 0;
     s.dungeon.monsters = [];
     if (s.dungeon.status !== 'resting') {
-      // 切层重开本层；休整中则保留休整进度，恢复后从新层第 1 波开始
+      // 切图重开；休整中则保留休整进度，恢复后从新图第 1 波开始
       s.dungeon.status = 'waveRest';
       s.dungeon.restRemainingS = 1;
     }
-    pushLog(s, 'system', `🗺️ 队伍转场至 ${floorDef.name}`);
+    pushLog(s, 'system', `🗺️ 队伍转场至 ${mapDef.name}`);
     set({ state: { ...s } });
     return { ok: true, message: '已转场' };
   },

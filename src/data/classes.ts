@@ -13,6 +13,10 @@ export interface ClassDef {
   perLevel: BaseStats;
 }
 
+/**
+ * perLevel 曲线按 10 级封顶标定（Lv10 ≈ 原 35 级满级强度）：
+ * D&D 制下 1 级学徒与 10 级传奇差距悬殊；经验攒得快，升级仪式贵。
+ */
 export const WARRIOR: ClassDef = {
   id: 'warrior',
   name: '战士',
@@ -21,7 +25,7 @@ export const WARRIOR: ClassDef = {
   preferredRow: 'front',
   combat: 'strike',
   base: { hp: 110, atk: 11, def: 7, spd: 7 },
-  perLevel: { hp: 14, atk: 2.5, def: 1.8, spd: 0.4 },
+  perLevel: { hp: 49, atk: 8.75, def: 6.3, spd: 0.6 },
 };
 
 export const MAGE: ClassDef = {
@@ -32,7 +36,7 @@ export const MAGE: ClassDef = {
   preferredRow: 'back',
   combat: 'aoe',
   base: { hp: 70, atk: 16, def: 2, spd: 9 },
-  perLevel: { hp: 7, atk: 4, def: 0.5, spd: 0.6 },
+  perLevel: { hp: 24.5, atk: 14, def: 1.75, spd: 0.9 },
 };
 
 export const ROGUE: ClassDef = {
@@ -43,7 +47,7 @@ export const ROGUE: ClassDef = {
   preferredRow: 'mid',
   combat: 'assassin',
   base: { hp: 80, atk: 14, def: 3, spd: 13 },
-  perLevel: { hp: 8, atk: 3.2, def: 0.8, spd: 1 },
+  perLevel: { hp: 28, atk: 11.2, def: 2.8, spd: 1.5 },
 };
 
 export const PRIEST: ClassDef = {
@@ -54,7 +58,7 @@ export const PRIEST: ClassDef = {
   preferredRow: 'back',
   combat: 'heal',
   base: { hp: 85, atk: 12, def: 4, spd: 10 },
-  perLevel: { hp: 9, atk: 2.8, def: 1, spd: 0.7 },
+  perLevel: { hp: 31.5, atk: 9.8, def: 3.5, spd: 1.05 },
 };
 
 export const RANGER: ClassDef = {
@@ -65,7 +69,7 @@ export const RANGER: ClassDef = {
   preferredRow: 'mid',
   combat: 'snipe',
   base: { hp: 90, atk: 13, def: 4, spd: 11 },
-  perLevel: { hp: 9, atk: 3, def: 1, spd: 0.8 },
+  perLevel: { hp: 31.5, atk: 10.5, def: 3.5, spd: 1.2 },
 };
 
 export const BARD: ClassDef = {
@@ -76,7 +80,7 @@ export const BARD: ClassDef = {
   preferredRow: 'mid',
   combat: 'inspire',
   base: { hp: 95, atk: 10, def: 5, spd: 10 },
-  perLevel: { hp: 10, atk: 2.2, def: 1.2, spd: 0.5 },
+  perLevel: { hp: 35, atk: 7.7, def: 4.2, spd: 0.75 },
 };
 
 export const CLASSES: Record<ClassId, ClassDef> = {
@@ -88,13 +92,12 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   [BARD.id]: BARD,
 };
 
-/** 开局冒险者 */
+/** 开局冒险者（Lv1 学徒战士） */
 export const STARTER_ADVENTURER = {
   id: 'adv_hank',
   name: '铁胃汉克',
   classId: WARRIOR.id,
   race: 'human' as const,
-  rarity: 'common' as const,
 };
 
 /** 盗贼专属暴击参数 */

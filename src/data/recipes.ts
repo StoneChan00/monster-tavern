@@ -66,7 +66,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'dropRate', mult: 1.2, durationS: 1200, label: '掉落率 +20%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['rogue'], weight: 4 },
-    unlock: { type: 'floorClear', floor: 2 },
+    unlock: { type: 'mapClear', map: 1 },
   },
   recipe_mushroom_soup: {
     id: 'recipe_mushroom_soup',
@@ -78,7 +78,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'hp', mult: 1.3, durationS: 900, label: 'HP 上限 +30%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['priest'], weight: 5 },
-    unlock: { type: 'floorClear', floor: 3 },
+    unlock: { type: 'mapClear', map: 1 },
   },
   recipe_crab_claws: {
     id: 'recipe_crab_claws',
@@ -90,7 +90,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'spd', mult: 1.2, durationS: 900, label: 'SPD +20%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['rogue'], weight: 5 },
-    unlock: { type: 'floorClear', floor: 3 },
+    unlock: { type: 'mapClear', map: 1 },
   },
   recipe_beast_roast: {
     id: 'recipe_beast_roast',
@@ -102,7 +102,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'atk', mult: 1.5, durationS: 1800, label: 'ATK +50%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['warrior', 'ranger'], weight: 6 },
-    unlock: { type: 'floorClear', floor: 4 },
+    unlock: { type: 'mapClear', map: 1 },
   },
   recipe_pudding: {
     id: 'recipe_pudding',
@@ -114,7 +114,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'hp', mult: 1.5, durationS: 1200, label: 'HP 上限 +50%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['mage'], weight: 5 },
-    unlock: { type: 'floorClear', floor: 5 },
+    unlock: { type: 'mapClear', map: 2 },
   },
   recipe_gummy: {
     id: 'recipe_gummy',
@@ -126,7 +126,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'spd', mult: 1.3, durationS: 1800, label: 'SPD +30%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['mage'], weight: 4 },
-    unlock: { type: 'floorClear', floor: 6 },
+    unlock: { type: 'mapClear', map: 2 },
   },
   recipe_mush_wine: {
     id: 'recipe_mush_wine',
@@ -138,7 +138,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'expGain', mult: 1.35, durationS: 1800, label: '经验获取 +35%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['bard'], weight: 5 },
-    unlock: { type: 'floorClear', floor: 8 },
+    unlock: { type: 'mapClear', map: 4 },
   },
   recipe_elixir: {
     id: 'recipe_elixir',
@@ -150,7 +150,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'atk', mult: 1.6, durationS: 2700, label: 'ATK +60%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['warrior', 'ranger'], weight: 6 },
-    unlock: { type: 'floorClear', floor: 9 },
+    unlock: { type: 'mapClear', map: 4 },
   },
   recipe_wraith_souffle: {
     id: 'recipe_wraith_souffle',
@@ -162,7 +162,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'expGain', mult: 1.35, durationS: 1800, label: '经验获取 +35%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['priest', 'mage'], weight: 5 },
-    unlock: { type: 'floorClear', floor: 10 },
+    unlock: { type: 'mapClear', map: 4 },
   },
   recipe_crystal_salad: {
     id: 'recipe_crystal_salad',
@@ -174,7 +174,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'atk', mult: 1.45, durationS: 1800, label: 'ATK +45%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['mage'], weight: 5 },
-    unlock: { type: 'floorClear', floor: 11 },
+    unlock: { type: 'mapClear', map: 5 },
   },
   recipe_void_stew: {
     id: 'recipe_void_stew',
@@ -186,7 +186,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'expGain', mult: 1.45, durationS: 1800, label: '经验获取 +45%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['bard'], weight: 6 },
-    unlock: { type: 'floorClear', floor: 13 },
+    unlock: { type: 'mapClear', map: 5 },
   },
   recipe_flayer_bisque: {
     id: 'recipe_flayer_bisque',
@@ -198,7 +198,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'spd', mult: 1.4, durationS: 2400, label: 'SPD +40%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['rogue'], weight: 6 },
-    unlock: { type: 'floorClear', floor: 16 },
+    unlock: { type: 'mapClear', map: 6 },
   },
   recipe_dragon_feast: {
     id: 'recipe_dragon_feast',
@@ -210,7 +210,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'atk', mult: 1.75, durationS: 3600, label: 'ATK +75%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['warrior', 'ranger'], weight: 7 },
-    unlock: { type: 'floorClear', floor: 18 },
+    unlock: { type: 'mapClear', map: 6 },
   },
   recipe_void_banquet: {
     id: 'recipe_void_banquet',
@@ -222,7 +222,7 @@ export const RECIPES: Record<RecipeId, RecipeDef> = {
     buff: { stat: 'def', mult: 1.6, durationS: 3600, label: 'DEF +60%' },
     mealLoyalty: BALANCE.LOYALTY_PER_MEAL,
     attraction: { classIds: ['bard', 'mage'], weight: 7 },
-    unlock: { type: 'floorClear', floor: 20 },
+    unlock: { type: 'mapClear', map: 6 },
   },
 };
 

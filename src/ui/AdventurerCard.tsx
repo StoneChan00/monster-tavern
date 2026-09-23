@@ -4,41 +4,45 @@ import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
-import { BALANCE } from '../data/balance';
-import {
-  adventurerLevelCap,
-  expToNext,
-  getAdventurerStats,
-  RARITY_INDEX,
-  RARITY_LABEL,
-} from '../engine/stats';
-import type { AdventurerState, Rarity } from '../engine/types';
+import { LEVEL_UP_COST, wageOfLevel } from '../data/balance';
+import { MATERIALS } from '../data/materials';
+import { expToNext, getAdventurerStats, levelTier } from '../engine/stats';
+import { LEVEL_CAP } from '../engine/types';
+import type { AdventurerState } from '../engine/types';
 
-export const RARITY_COLOR: Record<Rarity, string> = {
-  common: '#a89880',
-  fine: '#7cb342',
-  rare: '#5b9bd5',
-  epic: '#a569d8',
-  legendary: '#e8a33d',
-};
-
-/** 冒险者详情卡（编队/替补通用） */
+/** 冒险者详情卡（编队/替补通用）：D&D 等级制，经验满可花金币+材料进行升级仪式 */
 export function AdventurerCard({ adv }: { adv: AdventurerState }) {
   const s = useGameStore((st) => st.state);
   const cls = CLASSES[adv.classId];
   const stats = getAdventurerStats(s, adv);
   const need = expToNext(adv.level);
-  const cap = adventurerLevelCap(s.tavern.trainingGround);
-  const atCap = adv.level >= cap;
+  const atCap = adv.level >= LEVEL_CAP;
+  const expReady = adv.exp >= need;
   const hp = Math.min(adv.hp, stats.hp);
   const inParty = s.party.includes(adv.id);
-  const wage = BALANCE.WAGE_PER_RARITY[RARITY_INDEX[adv.rarity]];
+  const wage = wageOfLevel(adv.level);
+  const tier = levelTier(adv.level);
+  const cost = atCap ? null : LEVEL_UP_COST[adv.level - 1] ?? null;
+
+  const canPay =
+    cost !== null &&
+    s.player.gold >= cost.gold &&
+    Object.entries(cost.materials).every(([mid, cnt]) => (s.inventory[mid] ?? 0) >= (cnt ?? 0));
+  const missingText =
+    cost === null
+      ? ''
+      : s.player.gold < cost.gold
+        ? '金币不足'
+        : Object.entries(cost.materials)
+            .filter(([mid, cnt]) => (s.inventory[mid] ?? 0) < (cnt ?? 0))
+            .map(([mid, cnt]) => `${MATERIALS[mid]?.name ?? mid} 不足（还需 ${(cnt ?? 0) - (s.inventory[mid] ?? 0)}）`)
+            .join('，') || '材料不足';
 
   return (
     <Panel
       title={
-        <span style={{ color: RARITY_COLOR[adv.rarity] }}>
-          {adv.name} · {RARITY_LABEL[adv.rarity]}
+        <span style={{ color: tier.color }}>
+          {adv.name} · Lv.{adv.level} {tier.label}
         </span>
       }
       icon={<CharacterSprite classId={adv.classId} size={18} />}
@@ -51,7 +55,7 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
           </span>
           <span className="font-bold text-[#f0d78c]">
             Lv.{adv.level}
-            <span className="text-[#a89880]"> / {cap}</span>
+            <span className="text-[#a89880]"> / {LEVEL_CAP}</span>
           </span>
         </div>
 
@@ -67,10 +71,14 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
 
         <div>
           <div className="mb-0.5 flex justify-between">
-            <span className="text-[#a89880]">✨ EXP{atCap ? '（已达等级上限）' : ''}</span>
+            <span className="text-[#a89880]">✨ 历练{atCap ? '（已达传奇之巅）' : expReady ? '（可进行升级仪式）' : ''}</span>
             <span className="tabular-nums">{atCap ? '—' : `${adv.exp} / ${need}`}</span>
           </div>
-          <Bar value={atCap ? 1 : adv.exp} max={atCap ? 1 : need} color="#7e57c2" />
+          <Bar
+            value={atCap ? 1 : adv.exp}
+            max={atCap ? 1 : need}
+            color={expReady && !atCap ? '#ffd24a' : '#7e57c2'}
+          />
         </div>
 
         <div className="grid grid-cols-3 gap-1 pt-1">
@@ -91,6 +99,35 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
             日薪 💰{wage}/天
           </div>
         </div>
+
+        {atCap ? (
+          <div className="border-2 border-[#8a6d2f] bg-[#2a2115] p-1.5 text-center text-[11px] font-bold text-[#f0d78c]">
+            ⭐ 10 级传奇——这个世界没有更强的了
+          </div>
+        ) : expReady ? (
+          <div className="space-y-1">
+            <div className="text-[10px] text-[#a89880]">
+              升级仪式：💰{cost!.gold}
+              {Object.entries(cost!.materials).map(([mid, cnt]) => (
+                <span key={mid}>
+                  {' '}+ {MATERIALS[mid]?.icon}
+                  {MATERIALS[mid]?.name}×{cnt}
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="pixel-btn pixel-btn-primary w-full"
+              disabled={!canPay}
+              onClick={() => {
+                const r = useGameStore.getState().levelUpAdventurer(adv.id);
+                if (!r.ok) window.alert(r.message);
+              }}
+            >
+              {canPay ? `✨ 升级到 Lv.${adv.level + 1}（${levelTier(adv.level + 1).label}）` : missingText}
+            </button>
+          </div>
+        ) : null}
 
         <button
           type="button"

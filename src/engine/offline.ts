@@ -5,7 +5,6 @@ import type { GameState, OfflineReport, TickOptions } from './types';
 interface Snapshot {
   gold: number;
   lifetimeExp: number;
-  levelSum: number;
   inventory: Record<string, number>;
   wavesCleared: number;
   bossKills: number;
@@ -15,7 +14,6 @@ function snapshot(state: GameState): Snapshot {
   return {
     gold: state.player.gold,
     lifetimeExp: state.meta.lifetimeExpEarned,
-    levelSum: state.roster.reduce((s, a) => s + a.level, 0),
     inventory: { ...state.inventory },
     wavesCleared: state.meta.totalWavesCleared,
     bossKills: state.meta.totalBossKills,
@@ -52,7 +50,6 @@ export function applyOffline(state: GameState, awaySeconds: number, opts: TickOp
     efficiency: BALANCE.OFFLINE_EFFICIENCY,
     gold: state.player.gold - before.gold,
     exp: state.meta.lifetimeExpEarned - before.lifetimeExp,
-    levelsGained: state.roster.reduce((s, a) => s + a.level, 0) - before.levelSum,
     materials,
     wavesCleared: state.meta.totalWavesCleared - before.wavesCleared,
     bossKills: state.meta.totalBossKills - before.bossKills,

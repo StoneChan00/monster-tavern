@@ -9,15 +9,20 @@
  *   保证离线快进与在线经历完全一致的时间事件。
  */
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 5;
 
-export type Rarity = 'common' | 'fine' | 'rare' | 'epic' | 'legendary';
 export type ClassId = string;
 export type RaceId = string;
 export type MonsterId = string;
 export type MaterialId = string;
 export type RecipeId = string;
-export type FloorId = string;
+export type MapId = string;
+
+/**
+ * 冒险者等级即稀有度（D&D 5E 式）：1~10 级，等级越高越稀有。
+ * 10 级冒险者世界屈指可数——升级需经验攒满 + 金币/材料的「升级仪式」。
+ */
+export const LEVEL_CAP = 10;
 
 export type BuffStat = 'atk' | 'def' | 'hp' | 'spd' | 'expGain' | 'dropRate';
 
@@ -37,20 +42,19 @@ export interface AdventurerState {
   classId: ClassId;
   /** D&D 5E 种族（属性修正 + 名字风味） */
   race: RaceId;
-  rarity: Rarity;
-  level: number;
-  exp: number;
+  level: number; // 1~10（D&D 等级 = 稀有度）
+  exp: number; // 攒满 expToNext(level) 才能花钱升级
   hp: number; // 当前 HP（上限由 getAdventurerStats 计算）
   loyalty: number; // 0~100；归零离店
 }
 
-/** 到访酒馆、可签约的冒险者 */
+/** 到访酒馆、可签约的冒险者（自带 D&D 等级） */
 export interface Visitor {
   uid: number;
   name: string;
   classId: ClassId;
   race: RaceId;
-  rarity: Rarity;
+  level: number; // 1~10，高等级到访极稀有
   costGold: number;
   costMaterial: { materialId: MaterialId; count: number };
 }
@@ -117,8 +121,7 @@ export type EngineEvent =
   | { kind: 'death'; side: 'monster'; targetUid: number; targetMonsterId: MonsterId }
   | {
       kind: 'waveStart';
-      wave: number; // 1-based
-      waveCount: number;
+      wave: number; // 本图第 N 波（1-based，循环制无总波数）
       isBoss: boolean;
       monsters: Array<{ uid: number; monsterId: MonsterId }>;
     }
@@ -142,8 +145,12 @@ export interface GameState {
     lifetimeExpEarned: number;
     totalWavesCleared: number;
     totalBossKills: number;
-    /** 已首杀 BOSS 的楼层（首杀声望仅一次） */
-    floorsFirstCleared: FloorId[];
+    /** 已首杀 BOSS 的地图编号（首杀声望仅一次） */
+    mapsFirstCleared: number[];
+    /** 魔物图鉴：每种魔物的累计击杀数（图鉴发现 = 键存在） */
+    monsterKills: Partial<Record<MonsterId, number>>;
+    /** 累计出餐数（成就与统计页用） */
+    dishesCooked: number;
   };
   player: {
     gold: number;
@@ -171,18 +178,20 @@ export interface GameState {
     lounge: number; // 招待区 0~5：替补席上限/到访批次
     kitchen: number; // 厨房 0~4：生效菜谱数/烹饪速度
     dorm: number; // 宿舍 0~5：休整速度/忠诚保护
-    intel: number; // 情报网 0~4：掉落情报/预览层数
+    intel: number; // 情报网 0~4：掉落情报/预览地图数
   };
   dungeon: {
-    floorId: FloorId;
-    waveIndex: number; // 0-based
+    /** 当前地图 id（map_1 ~ map_6） */
+    mapId: MapId;
     status: DungeonStatus;
     restRemainingS: number; // waveRest / resting 剩余秒数
     monsters: MonsterInstance[];
-    /** 已解锁的最高层（数字 1~10） */
-    highestFloor: number;
-    /** 驻farm层（玩家可随时切换，≤ highestFloor） */
-    farmFloor: number;
+    /** 已解锁地图数（1~6）：首杀本图 BOSS 解锁下一张 */
+    unlockedMaps: number;
+    /** 当前驻扎地图编号（玩家可随时切换，≤ unlockedMaps） */
+    activeMap: number;
+    /** 本图累计清波数（切图清零，展示用） */
+    waveCount: number;
   };
   log: LogEntry[];
   /** 瞬态事件流（回放用，不存档） */
@@ -203,7 +212,6 @@ export interface OfflineReport {
   efficiency: number;
   gold: number;
   exp: number;
-  levelsGained: number;
   materials: Record<string, number>;
   wavesCleared: number;
   bossKills: number;

@@ -47,8 +47,12 @@ export const CLASS_SPRITES: Partial<Record<ClassId, string>> = {
   bard: 'bard.png',
 };
 
-/** 战斗视口地牢图块 */
-export const TILE_SPRITES = {
-  floor: 'floor.png',
-  wall: 'wall.png',
-} as const;
+/** 战斗视口：6 张主题地图的地板贴图（MAP_DEFS.floorSprite 引用这里的文件名） */
+export const TILE_SPRITES = [
+  'floor_mossy.png',
+  'floor_mine.png',
+  'floor_crypt.png',
+  'floor_lava.png',
+  'floor_crystal.png',
+  'floor_void.png',
+] as const;

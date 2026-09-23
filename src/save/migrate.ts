@@ -89,10 +89,92 @@ function migrateV2toV3(s: Record<string, unknown>): Record<string, unknown> {
   return { ...s, version: 3, roster, recruitment: { ...rec, visitors } };
 }
 
+/**
+ * v3（Phase 2 前期）→ v4（图鉴/成就/统计）：
+ * meta 补图鉴击杀表与出餐计数（历史进度无法回溯，从 0 开始积累）。
+ */
+function migrateV3toV4(s: Record<string, unknown>): Record<string, unknown> {
+  const meta = (s.meta ?? {}) as Record<string, unknown>;
+  return {
+    ...s,
+    version: 4,
+    meta: {
+      ...meta,
+      monsterKills: (meta.monsterKills as Record<string, number>) ?? {},
+      dishesCooked: (meta.dishesCooked as number) ?? 0,
+    },
+  };
+}
+
+/**
+ * v4（20 层地牢 / 5 档稀有度）→ v5（6 张地图 / D&D 等级制）：
+ * - 冒险者：rarity + level 折叠为新等级 1~10（稀有度给保底，旧等级按 3.5:1 压缩取 max），exp 清零
+ * - 地牢：层数按区间映射为地图（1-4→图1，5-6→图2，7→图3，8-10→图4，11-15→图5，16-20→图6）
+ * - floorsFirstCleared → mapsFirstCleared（首杀楼层所在地图）
+ */
+function migrateV4toV5(s: Record<string, unknown>): Record<string, unknown> {
+  const rarityBase: Record<string, number> = { common: 1, fine: 2, rare: 3, epic: 4, legendary: 5 };
+  const floorToMap = (n: number): number =>
+    n <= 4 ? 1 : n <= 6 ? 2 : n === 7 ? 3 : n <= 10 ? 4 : n <= 15 ? 5 : 6;
+
+  const foldLevel = (a: Record<string, unknown>): Record<string, unknown> => {
+    const oldLevel = (a.level as number) ?? 1;
+    const base = rarityBase[(a.rarity as string) ?? 'common'] ?? 1;
+    const level = Math.min(10, Math.max(base, Math.ceil(oldLevel / 3.5)));
+    const { rarity: _rarity, ...rest } = a;
+    void _rarity;
+    return { ...rest, level, exp: 0 };
+  };
+
+  const roster = ((s.roster ?? []) as Array<Record<string, unknown>>).map(foldLevel);
+  const rec = (s.recruitment ?? {}) as Record<string, unknown>;
+  const visitors = ((rec.visitors ?? []) as Array<Record<string, unknown>>).map(foldLevel);
+
+  const meta = (s.meta ?? {}) as Record<string, unknown>;
+  const oldFloors = (meta.floorsFirstCleared as string[]) ?? [];
+  const mapsFirstCleared = [...new Set(
+    oldFloors
+      .map((id) => floorToMap(parseInt(id.split('_')[1] ?? '1', 10) || 1))
+      .filter((n) => Number.isFinite(n)),
+  )];
+  const { floorsFirstCleared: _f, ...metaRest } = meta;
+  void _f;
+
+  const dungeonOld = (s.dungeon ?? {}) as Record<string, unknown>;
+  const h = (dungeonOld.highestFloor as number) ?? 1;
+  const unlockedFromProgress =
+    h <= 1 ? 1 : h <= 5 ? 2 : h <= 7 ? 3 : h <= 11 ? 4 : h <= 16 ? 5 : 6;
+  const unlockedMaps = Math.min(
+    6,
+    Math.max(unlockedFromProgress, ...mapsFirstCleared.map((n) => n + 1), 1),
+  );
+  const activeMap = Math.min(unlockedMaps, floorToMap((dungeonOld.farmFloor as number) ?? 1));
+
+  return {
+    ...s,
+    version: 5,
+    meta: { ...metaRest, mapsFirstCleared },
+    roster,
+    recruitment: { ...rec, visitors },
+    dungeon: {
+      mapId: `map_${activeMap}`,
+      // 战斗中/波间 → 转入 1 秒波间，恢复后由 tick 重新生成首波；休整保留
+      status: dungeonOld.status === 'resting' ? 'resting' : 'waveRest',
+      restRemainingS: 1,
+      monsters: [],
+      unlockedMaps,
+      activeMap,
+      waveCount: 0,
+    },
+  };
+}
+
 /** 版本迁移链：migrations[n] 把 v_n 档案升级到 v_{n+1}。新增版本时在此追加。 */
 const migrations: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
   1: migrateV1toV2,
   2: migrateV2toV3,
+  3: migrateV3toV4,
+  4: migrateV4toV5,
 };
 
 export function serialize(state: GameState): string {

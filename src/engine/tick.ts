@@ -1,9 +1,8 @@
-import { BALANCE, kitchenBuffSlots, kitchenSpeedMult } from '../data/balance';
+import { BALANCE, kitchenBuffSlots, kitchenSpeedMult, wageOfLevel } from '../data/balance';
 import { RECIPES } from '../data/recipes';
 import { CLASSES } from '../data/classes';
-import { FLOORS, floorIdOf } from '../data/monsters';
 import { resolveRound, spawnWave } from './combat';
-import { getAdventurerStats, RARITY_INDEX } from './stats';
+import { getAdventurerStats } from './stats';
 import { pushEvent, pushLog } from './log';
 import { generateVisitors } from './recruitment';
 import { getPartyMembers } from './party';
@@ -26,7 +25,7 @@ function tickOnce(state: GameState, opts: TickOptions): void {
   // 模拟时钟推进（招募到访 / 日薪结算都基于它）
   state.meta.now += 1000;
 
-  // ── 地牢 ─────────────────────────────
+  // ── 地牢（地图制无限循环） ───────────
   const d = state.dungeon;
   switch (d.status) {
     case 'combat':
@@ -40,13 +39,10 @@ function tickOnce(state: GameState, opts: TickOptions): void {
           for (const m of getPartyMembers(state)) {
             m.adv.hp = getAdventurerStats(state, m.adv).hp;
           }
-          d.waveIndex = 0;
           pushEvent(state, { kind: 'revive' });
           pushLog(state, 'system', '🛏️ 休整完毕，队伍满血重返地牢！');
-        } else {
-          d.waveIndex = (d.waveIndex + 1) % FLOORS[d.floorId].waves.length;
         }
-        spawnWave(state);
+        spawnWave(state, rng);
       }
       break;
     }
@@ -113,6 +109,7 @@ function completeCooking(state: GameState): void {
     return;
   }
   state.kitchen.job = null;
+  state.meta.dishesCooked += 1;
   // 同菜谱效果刷新（不叠加）
   state.kitchen.buffs = state.kitchen.buffs.filter((b) => b.recipeId !== recipe.id);
   // 超出同时生效上限 → 淘汰最早的
@@ -148,7 +145,7 @@ function settleWagesIfDue(state: GameState): void {
   state.recruitment.lastWageDay = day;
   if (state.roster.length === 0) return;
 
-  const total = state.roster.reduce((s, a) => s + BALANCE.WAGE_PER_RARITY[RARITY_INDEX[a.rarity]], 0);
+  const total = state.roster.reduce((s, a) => s + wageOfLevel(a.level), 0);
   if (state.player.gold >= total) {
     state.player.gold -= total;
     pushLog(state, 'system', `💰 日薪结算：-${total} 金币（${state.roster.length} 名冒险者）`);
@@ -186,8 +183,8 @@ function checkRecipeUnlocks(state: GameState): void {
     let ok = false;
     if (r.unlock.type === 'initial') {
       ok = true;
-    } else if (r.unlock.type === 'floorClear') {
-      ok = state.meta.floorsFirstCleared.includes(floorIdOf(r.unlock.floor));
+    } else if (r.unlock.type === 'mapClear') {
+      ok = state.meta.mapsFirstCleared.includes(r.unlock.map);
     } else if (r.unlock.type === 'reputation') {
       ok = state.player.reputation >= r.unlock.value;
     }
