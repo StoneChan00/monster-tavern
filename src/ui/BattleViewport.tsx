@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { useGameStore } from '../store/gameStore';
+import { BALANCE } from '../data/balance';
 import { CLASSES } from '../data/classes';
 import { MONSTERS } from '../data/monsters';
 import { MAPS, MAP_DEFS } from '../data/monsters';
@@ -111,13 +112,27 @@ export function BattleViewport() {
       return 34 + (i * (VIEW_H - 68)) / (count - 1);
     };
 
+    /** 站位纵深：前排更贴近魔物、后排靠后（X 轴错位体现前后排） */
+    const rowXOffset = (slot: number): number => {
+      const row = BALANCE.SLOT_ROWS[slot];
+      if (row === 'front') return 22;
+      if (row === 'mid') return 0;
+      return -22;
+    };
+
     const layoutParty = (state: GameState): void => {
       const members = getPartyMembers(state);
       const sig = members.map((m) => m.adv.id).join(',');
       if (sig === partySignature) {
+        // 存活状态同步：倒下 → 半透明，复活/回复 → 恢复不透明
         for (const m of members) {
           const u = partyUnits.get(m.adv.id);
-          if (u && m.adv.hp <= 0 && u.root.alpha > 0.5) u.root.alpha = 0.35;
+          if (!u || u.root.destroyed) continue;
+          if (m.adv.hp <= 0) {
+            if (u.root.alpha > 0.5) u.root.alpha = 0.35;
+          } else if (u.root.alpha < 0.5) {
+            u.root.alpha = 1;
+          }
         }
         return;
       }
@@ -128,10 +143,11 @@ export function BattleViewport() {
         const root = new Container();
         root.addChild(makeIcon(undefined, m.adv.classId));
         const y = spreadY(i, members.length);
-        root.position.set(PARTY_X, y);
+        const x = PARTY_X + rowXOffset(m.slot);
+        root.position.set(x, y);
         root.alpha = m.adv.hp <= 0 ? 0.35 : 1;
         app.stage.addChild(root);
-        partyUnits.set(m.adv.id, { root, baseX: PARTY_X, baseY: y });
+        partyUnits.set(m.adv.id, { root, baseX: x, baseY: y });
       });
     };
 
@@ -188,6 +204,8 @@ export function BattleViewport() {
       app.stage.addChild(t);
       banner = t;
       addTween(1000, (k) => {
+        // 旧 banner 可能在补间期间被新 banner 替换销毁（如复活+新波次同帧）——守卫防 ticker 崩溃
+        if (t.destroyed) return;
         t.alpha = k < 0.15 ? k / 0.15 : 1 - Math.max(0, (k - 0.65) / 0.35);
         t.scale.set(1 + 0.15 * Math.sin(Math.min(1, k * 2) * Math.PI));
       });
@@ -223,7 +241,10 @@ export function BattleViewport() {
           if (e.attackerSide === 'party') {
             const a = partyUnits.get(e.attackerId);
             const t = monsterUnits.get(e.targetUid);
-            if (a) addTween(340, (k) => void (a.root.x = a.baseX + Math.sin(k * Math.PI) * 24));
+            if (a) addTween(340, (k) => {
+              if (a.root.destroyed) return;
+              a.root.x = a.baseX + Math.sin(k * Math.PI) * 24;
+            });
             if (t) {
               floatText(
                 t.baseX,
@@ -236,7 +257,10 @@ export function BattleViewport() {
           } else {
             const a = monsterUnits.get(e.attackerUid);
             const t = partyUnits.get(e.targetId);
-            if (a) addTween(340, (k) => void (a.root.x = a.baseX - Math.sin(k * Math.PI) * 24));
+            if (a) addTween(340, (k) => {
+              if (a.root.destroyed) return;
+              a.root.x = a.baseX - Math.sin(k * Math.PI) * 24;
+            });
             if (t) floatText(t.baseX, t.baseY, `-${e.damage}`, '#ff8a80');
           }
           break;
@@ -268,10 +292,10 @@ export function BattleViewport() {
         }
         case 'waveStart':
           buildMonsters(e.monsters, true);
-          showBanner(e.isBoss ? '👑 BOSS 战！' : `第 ${e.wave} 波`, e.isBoss ? '#ff8a80' : '#f0d78c');
+          showBanner(e.isElite ? '👑 精英来袭！' : `第 ${e.wave} 波`, e.isElite ? '#ff8a80' : '#f0d78c');
           break;
         case 'waveClear':
-          showBanner(e.isBoss ? '👑 层底 BOSS 肃清！' : `第 ${e.wave} 波肃清 ✅`, '#9ccc65');
+          showBanner(e.isElite ? '👑 精英讨伐成功！' : `第 ${e.wave} 波肃清 ✅`, '#9ccc65');
           break;
         case 'wipe':
           showBanner('💔 队伍全灭……', '#ff8a80');
