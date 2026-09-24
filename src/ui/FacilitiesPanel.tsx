@@ -30,11 +30,12 @@ function FacilityCard({ facility }: { facility: FacilityDef }) {
 
   const goldOk = cost ? s.player.gold >= cost.gold : false;
   const repOk = cost ? (cost.reputation ?? 0) <= s.player.reputation : false;
+  const recipeOk = cost ? (cost.unlockedRecipes ?? 0) <= s.kitchen.unlockedRecipes.length : false;
   const matOk = cost
     ? Object.entries(cost.materials).every(([mid, need]) => (s.inventory[mid] ?? 0) >= (need ?? 0))
     : false;
-  const canUp = !maxed && goldOk && repOk && matOk;
-  const reason = !goldOk ? '金币不足' : !repOk ? '声望不足' : '材料不足';
+  const canUp = !maxed && goldOk && repOk && recipeOk && matOk;
+  const reason = !goldOk ? '金币不足' : !repOk ? '声望不足' : !recipeOk ? '菜谱不足' : '材料不足';
 
   return (
     <div className="border-2 border-[#3a2d1e] bg-[#1f1812] p-2 text-xs">
@@ -56,6 +57,7 @@ function FacilityCard({ facility }: { facility: FacilityDef }) {
           <div className="mt-1 text-[11px] text-[#a89880]">
             升级费用：💰{cost!.gold}
             {cost!.reputation ? ` · ⭐${cost!.reputation}` : ''}
+            {cost!.unlockedRecipes ? ` · 📖菜谱${cost!.unlockedRecipes}道` : ''}
             {Object.entries(cost!.materials).map(([mid, need]) => (
               <span key={mid}>
                 {' '}+ {MATERIALS[mid]?.icon}
