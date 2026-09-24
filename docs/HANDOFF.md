@@ -10,7 +10,21 @@
 - 存档版本 **v7**（精英体系 + 厨房菜单制；v6 档自动迁移：job/buffs → 7 槽空菜单）
 - 页签：地牢（地图+编队+战斗）/ 宿舍（名册）/ 厨房（**菜单制**）/ 酒馆（地图+招待区+设施+背包）/ 图鉴
 
-## 本轮会话已完成（用户五点反馈 → v7 大改）
+## 本轮会话已完成（用户三点反馈 → 修正轮）
+
+**① 团灭指引立即刷新招募**：`grantWipeSubsidy` 无客时**直接 `generateVisitors`**（不再等 ≤60s 周期），批次周期重置；弹窗文案改"冒险者们已经赶到酒馆"
+
+**② 战斗视口 DPR 修复 + 无缝地板**：
+- **DPR>1 右侧黑块（真 bug）**：Pixi v8 `renderer.width` 已是 CSS 像素，`stageWidth()` 再除 resolution → DPR=2 时地板只铺 53%。修复 = `stageWidth()` 直读 `host.clientWidth`；`smoke-sprites.cjs` 常态以 **deviceScaleFactor=2** 跑并断言**全宽覆盖 ≥97%**（回归防线）
+- **二至六图贴图不贴合**：此前选的 Kenney tile 多为带边框的花纹/墙块，平铺出格子缝。替换为**程序化无缝地板**：`assets/tools/gen-floors.cjs`（mulberry32 确定性种子、调色板直出、印记避让边缘 1px）生成 6 主题 × 3 变体（基底稀/密 + 点缀：裂缝/亮斑/卵石）；`floorTint` 全部改 0xffffff；pngjs 已入 devDeps（工具可复跑）
+
+**③ 精英 = 原生 BOSS（推翻"普通怪加标记"方案）**：
+- `MapDef.elitePool` 回归 `MonsterId[]`——每图原生 BOSS（m1:4 只 / m2:2 / m3:1 / m4:3 / m5:5 / m6:5，共 20 只），自带 BOSS 级数值与贴图，无倍率体系（ELITE_*_MULT 已删）
+- `ELITE_SIGIL`（monsters.ts）：20 只 BOSS → 职业徽记固定分配（战士4/法师4/盗贼3/牧师3/游侠3/诗人3，每职业跨 ≥2 图）——徽记不区分地图，升级只需"该职业的任意精英 + 对应图魔核"
+- `MonsterInstance.elite` 瘦身为 `{ sigil }`（名字用 `MONSTERS[id].name`）；存档兼容（多余 name 字段无害，无版本号变更）
+- m5 的 void_weaver 回归纯 BOSS（移出普通池）；自造的 36 个精英名（虚空弥撒等）全部删除
+
+## 此前（v7 主版本）已完成
 
 **① 休整后战斗画面卡住（已根治）**：根因 = 复活事件与新波次**同帧**处理时，新 banner 销毁旧 banner 但旧 banner 的 1000ms 补间仍在跑 → 对已销毁 Text 调 `t.scale.set()` → **Pixi ticker 每帧抛错 → 视口永久冻结**。修复 = showBanner/hit 补间/layoutParty 全部加 `destroyed` 守卫；另修复活后队伍永远 0.35 透明度（layoutParty 只暗化不恢复）。定向冒烟 `smoke-revive.cjs`（休整期鲜艳红=0 → 复活后=342 → 无 pageerror）
 
