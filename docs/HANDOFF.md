@@ -33,6 +33,7 @@
 
 ## 关键技术备忘
 
+- **素材已入库**：`assets/packs/` 6 个 CC0 包（见 `assets/README.md`）——Tiny Creatures 180 魔物（同风格补图主力）、Roguelike Indoor 480 家具（酒馆视觉）、16x16 Food 188 食物图标（菜谱/酒窖线）、Puny Dungeon/Characters、Tiny Town。**sheet 有 1px 间距**（网格步进 17px），优先用各包 `Tiles/` 独立 PNG；魔物默认朝右，BattleViewport 镜像惯例直接兼容；itch.io 本机不可达时走 OGA 直链（README 有复下载直链）
 - **node PATH 前缀（每条命令必须）**：`$env:Path = "D:\1_Sotfware\Nodejs;C:\Users\chens\AppData\Roaming\npm;" + $env:Path`
 - 命令：`pnpm dev`（5173）/ `pnpm build` / `pnpm test`
 - 架构分层：`engine/`（纯函数模拟）→ `store/`（Zustand 唯一状态所有者）→ `ui/`；`data/` 全部类型化内容；战斗事件流 `state.events`（瞬态，serialize 剥离）
