@@ -9,6 +9,7 @@ import { classWeights, generateVisitors } from '../src/engine/recruitment';
 import {
   adventurerLevelCap,
   activeMenuRecipes,
+  activeMenuStructures,
   expToNext,
   getAdventurerStats,
   getPartyDropMult,
@@ -673,20 +674,50 @@ describe('菜谱与厨房（v7 菜单制）', () => {
     expect(activeMenuRecipes(s)).toEqual([]);
   });
 
-  it('厨房 1 级结构要求：前菜+主菜+饮品 覆盖才生效', () => {
+  it('结构加成嵌套：菜品独立生效，满足结构获得额外加成且叠加', () => {
     const s = freshState();
     freezeCombat(s);
+    s.roster[0].level = 5; // 避免低攻取整
+    s.roster[0].hp = getAdventurerStats(s, s.roster[0]).hp;
     s.tavern.kitchen = 1;
-    s.kitchen.unlockedRecipes.push('recipe_beast_roast'); // 主菜（mapClear:1）
-    // gel_soda（饮品）与 bat_wings（前菜）为初始解锁
-    s.kitchen.menu[0] = 'recipe_bat_wings';
-    s.kitchen.menu[1] = 'recipe_beast_roast';
+    s.kitchen.menu[0] = 'recipe_bat_wings'; // 前菜
+    s.kitchen.menu[1] = 'recipe_beast_roast'; // 主菜
     s.kitchen.menuFed[0] = true;
     s.kitchen.menuFed[1] = true;
-    expect(activeMenuRecipes(s)).toEqual([]); // 缺饮品 → 整体暂停
-    s.kitchen.menu[2] = 'recipe_gel_soda';
+    // 菜品效果独立生效（不再有结构门控）
+    expect(activeMenuRecipes(s).length).toBe(2);
+    expect(activeMenuStructures(s)).toEqual([]); // 缺饮品 → 1 级结构未激活
+    const atkNoStruct = getAdventurerStats(s, s.roster[0]).atk;
+    // 补上饮品 → 1 级结构「温饱套餐」激活（忠诚加成，不改属性）
+    s.kitchen.menu[2] = 'recipe_gel_soda'; // 饮品
     s.kitchen.menuFed[2] = true;
-    expect(activeMenuRecipes(s).length).toBe(3); // 结构满足 → 全部生效
+    expect(activeMenuStructures(s)).toEqual([1]);
+    expect(getAdventurerStats(s, s.roster[0]).atk).toBe(atkNoStruct); // 1 级结构无属性加成
+    // 供给周期忠诚：基础 3 + 温饱套餐 2 = 5
+    s.inventory['mat_bat_wing'] = 99;
+    s.inventory['mat_rock_salt'] = 99;
+    s.inventory['mat_mushroom_cap'] = 99;
+    s.inventory['mat_wolf_meat'] = 99; // beast_roast 主材
+    s.inventory['mat_gel'] = 99;
+    const loyalty0 = s.roster[0].loyalty;
+    runMenuCycle(s);
+    expect(s.roster[0].loyalty).toBe(Math.min(100, loyalty0 + BALANCE.MENU_LOYALTY_PER_CYCLE + 2));
+    // 厨房 2 级（4 槽）+ 副菜 → 1+2 级结构叠加（2 级全属性 +5%）
+    s.tavern.kitchen = 2;
+    s.kitchen.menu[3] = 'recipe_crab_claws'; // 副菜
+    s.kitchen.menuFed[3] = true;
+    expect(activeMenuStructures(s)).toEqual([1, 2]);
+    expect(getAdventurerStats(s, s.roster[0]).atk).toBeGreaterThan(atkNoStruct);
+    // 4 级厨房满 7 道全席 → 1-4 级全部激活（嵌套满足）
+    s.tavern.kitchen = 4;
+    s.kitchen.unlockedRecipes.push('recipe_mushroom_soup', 'recipe_jelly_salad', 'recipe_pudding');
+    s.kitchen.menu[4] = 'recipe_mushroom_soup'; // 汤
+    s.kitchen.menu[5] = 'recipe_jelly_salad'; // 沙拉
+    s.kitchen.menu[6] = 'recipe_pudding'; // 甜点
+    s.kitchen.menuFed[4] = true;
+    s.kitchen.menuFed[5] = true;
+    s.kitchen.menuFed[6] = true;
+    expect(activeMenuStructures(s)).toEqual([1, 2, 3, 4]);
   });
 
   it('首杀图1精英解锁 mapClear 菜谱', () => {
