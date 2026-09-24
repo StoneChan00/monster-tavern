@@ -322,32 +322,35 @@ export function BattleViewport() {
     });
 
     void (async () => {
-      // 预载像素贴图（CC0 Kenney），失败则回退 emoji
+      // 预载像素贴图（CC0 Kenney），失败则回退 emoji。
+      // URL 一律以 BASE_URL 前缀（GitHub Pages 子路径部署）
+      const spriteUrl = (kind: 'monsters' | 'classes' | 'tiles', file: string) =>
+        `${import.meta.env.BASE_URL}sprites/${kind}/${file}`;
       const monsterEntries = Object.entries(MONSTER_SPRITES);
       const classEntries = Object.entries(CLASS_SPRITES);
       try {
         const urls = [
-          ...monsterEntries.map(([, file]) => `/sprites/monsters/${file}`),
-          ...classEntries.map(([, file]) => `/sprites/classes/${file}`),
-          ...FLOOR_SPRITE_FILES.map((file) => `/sprites/tiles/${file}`),
+          ...monsterEntries.map(([, file]) => spriteUrl('monsters', file)),
+          ...classEntries.map(([, file]) => spriteUrl('classes', file)),
+          ...FLOOR_SPRITE_FILES.map((file) => spriteUrl('tiles', file)),
         ];
         const textures = await Assets.load(urls);
         for (const [id, file] of monsterEntries) {
-          const tex = textures[`/sprites/monsters/${file}`];
+          const tex = textures[spriteUrl('monsters', file)];
           if (tex) {
             tex.source.scaleMode = 'nearest';
             textureCache.set(id as MonsterId, tex);
           }
         }
         for (const [id, file] of classEntries) {
-          const tex = textures[`/sprites/classes/${file}`];
+          const tex = textures[spriteUrl('classes', file)];
           if (tex) {
             tex.source.scaleMode = 'nearest';
             classTextureCache.set(id as ClassId, tex);
           }
         }
         for (const file of FLOOR_SPRITE_FILES) {
-          const tex = textures[`/sprites/tiles/${file}`];
+          const tex = textures[spriteUrl('tiles', file)];
           if (tex) {
             tex.source.scaleMode = 'nearest';
             floorTextures.set(file, tex);

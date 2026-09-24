@@ -14,7 +14,7 @@ export function MonsterSprite({ monsterId, fallback, size = 20 }: MonsterSpriteP
   if (sprite) {
     return (
       <img
-        src={`/sprites/monsters/${sprite}`}
+        src={`${import.meta.env.BASE_URL}sprites/monsters/${sprite}`}
         alt=""
         width={size}
         height={size}
