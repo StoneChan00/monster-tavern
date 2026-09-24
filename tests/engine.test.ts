@@ -1,13 +1,14 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInitialState } from '../src/engine/initialState';
-import { tick } from '../src/engine/tick';
+import { tick, runMenuCycle } from '../src/engine/tick';
 import { applyOffline } from '../src/engine/offline';
 import { spawnWave } from '../src/engine/combat';
 import { classWeights, generateVisitors } from '../src/engine/recruitment';
 import {
   adventurerLevelCap,
+  activeMenuRecipes,
   expToNext,
   getAdventurerStats,
   getPartyDropMult,
@@ -19,7 +20,7 @@ import { serialize, deserialize } from '../src/save/migrate';
 import { useGameStore } from '../src/store/gameStore';
 import {
   BALANCE,
-  LEVEL_UP_COST,
+  levelUpCost,
   rosterCap,
   signCostOfLevel,
   signMaterialOfLevel,
@@ -85,8 +86,8 @@ function setStoreState(s: GameState): void {
 
 // ────────────────────────────────────────────
 
-describe('初始状态 v6', () => {
-  it('开局：汉克(Lv1 学徒) + 单人编队 + 2 道初始菜谱 + 60 金币 + 苔藓洞窟', () => {
+describe('初始状态 v7', () => {
+  it('开局：汉克(Lv1 学徒) + 单人编队 + 3 道初始菜谱 + 60 金币 + 空菜单', () => {
     const s = freshState();
     expect(s.roster.length).toBe(1);
     expect(s.roster[0].name).toBe('铁胃汉克');
@@ -98,14 +99,17 @@ describe('初始状态 v6', () => {
     expect(s.dungeon.mapId).toBe('map_1');
     expect(s.kitchen.unlockedRecipes).toContain('recipe_gel_soup');
     expect(s.kitchen.unlockedRecipes).toContain('recipe_bat_wings');
+    expect(s.kitchen.unlockedRecipes).toContain('recipe_gel_soda'); // v7 新初始饮品
+    expect(s.kitchen.menu).toHaveLength(7); // 固定 7 槽（当前可用 2 槽）
+    expect(s.kitchen.menu.every((x) => x === null)).toBe(true);
     expect(s.player.gold).toBe(60);
     expect(s.meta.wipeSubsidyClaimed).toBe(false); // 首次团灭资助未领取
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(6);
+    expect(SAVE_VERSION).toBe(7);
   });
 });
 
-describe('存档迁移链（v1 → v6）', () => {
+describe('存档迁移链（v1 → v7）', () => {
   it('Phase 0 存档完整升级：进度保留、种族补齐、等级折叠、地图重建', () => {
     const v1 = {
       version: 1,
@@ -139,7 +143,7 @@ describe('存档迁移链（v1 → v6）', () => {
     const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 1, state: v1, exportedAt: 1 });
     const loaded = deserialize(raw);
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(6);
+    expect(loaded!.version).toBe(7);
     expect(loaded!.roster[0].name).toBe('铁胃汉克');
     expect(loaded!.roster[0].race).toBe('human'); // v3 补种族
     // v5 等级折叠：common(保底 1) + 旧 4 级 → ceil(4/3.5)=2
@@ -176,7 +180,7 @@ describe('存档迁移链（v1 → v6）', () => {
     const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 4, state: v4Like, exportedAt: 1 });
     const loaded = deserialize(raw);
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(6);
+    expect(loaded!.version).toBe(7);
     // epic(保底 4) + 旧 20 级 → ceil(20/3.5)=6
     expect(loaded!.roster[0].level).toBe(6);
     expect(loaded!.roster[0].exp).toBe(0);
@@ -198,10 +202,28 @@ describe('存档迁移链（v1 → v6）', () => {
     const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 5, state: v5Like, exportedAt: 1 });
     const loaded = deserialize(raw);
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(6);
+    expect(loaded!.version).toBe(7);
     expect(loaded!.meta.wipeSubsidyClaimed).toBe(false); // 旧档无团灭史 → 按未领取处理
     expect(loaded!.player.gold).toBe(60);
     expect(loaded!.roster[0].name).toBe('铁胃汉克');
+  });
+
+  it('v6 存档升级 v7：厨房 job/buffs → 菜单制，菜谱解锁保留', () => {
+    const s = freshState();
+    const v6Like = JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
+    v6Like.version = 6;
+    const kitchen = v6Like.kitchen as Record<string, unknown>;
+    kitchen.job = { recipeId: 'recipe_gel_soup', remainingS: 5, totalS: 600 }; // 旧烹饪任务
+    kitchen.buffs = [];
+    const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 6, state: v6Like, exportedAt: 1 });
+    const loaded = deserialize(raw);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.version).toBe(7);
+    expect(loaded!.kitchen.menu).toHaveLength(7);
+    expect(loaded!.kitchen.menu.every((x) => x === null)).toBe(true);
+    expect(loaded!.kitchen.menuFed.every((x) => x === false)).toBe(true);
+    expect(loaded!.kitchen.unlockedRecipes).toContain('recipe_gel_soup'); // 解锁进度继承
+    expect(loaded!.kitchen.nextMenuCycleAt).toBeGreaterThan(loaded!.meta.now);
   });
 
   it('serialize → deserialize 往返一致（v5，瞬态事件剥离）', () => {
@@ -223,51 +245,72 @@ describe('存档迁移链（v1 → v6）', () => {
   });
 });
 
-describe('地图制随机波次', () => {
-  it('6 张地图结构完整：魔物池已注册、53 种全分布、首杀声望递增', () => {
+describe('地图制随机波次（精英体系）', () => {
+  it('6 张地图结构完整：魔物/精英池已注册、首杀声望递增、职业徽记全覆盖', () => {
     expect(MAP_DEFS).toHaveLength(6);
     const all = new Set<string>();
     let prevRep = 0;
+    const sigilClasses = new Set<string>();
     for (const m of MAP_DEFS) {
       expect(m.monsterPool.length).toBeGreaterThan(0);
-      expect(m.bossPool.length).toBeGreaterThan(0);
-      for (const mid of [...m.monsterPool, ...m.bossPool]) {
+      expect(m.elitePool).toHaveLength(6); // 每图六只职业向精英
+      for (const mid of m.monsterPool) {
         expect(MONSTERS[mid]).toBeDefined();
         all.add(mid);
+      }
+      for (const e of m.elitePool) {
+        expect(MONSTERS[e.base]).toBeDefined();
+        all.add(e.base); // 精英借用体型的魔物同样有归属
+        sigilClasses.add(e.sigil);
       }
       expect(m.firstClearReputation).toBeGreaterThan(prevRep);
       prevRep = m.firstClearReputation;
     }
-    expect(all.size).toBe(Object.keys(MONSTERS).length); // 53 种全部有归属
+    // 59 种全部有归属（常规池 + 扩充怪）
+    expect(all.size).toBe(Object.keys(MONSTERS).length);
+    // 每图的六只精英分别对应六个职业
+    expect(sigilClasses.size).toBe(6);
+    for (const m of MAP_DEFS) {
+      expect(new Set(m.elitePool.map((e) => e.sigil)).size).toBe(6);
+    }
   });
 
   it('普通波：2~4 只、全部来自本图池', () => {
     const s = freshState();
     for (let i = 0; i < 20; i++) {
-      // 屏蔽 BOSS 判定（首值钳到 0.5），只测普通波组波
+      // 屏蔽精英判定（首值钳到 0.5），只测普通波组波
       const base = mulberry32(i + 1);
-      const noBossRng = (): number => {
+      const noEliteRng = (): number => {
         const v = base();
-        return v < BALANCE.BOSS_CHANCE ? 0.5 : v;
+        return v < BALANCE.ELITE_CHANCE ? 0.5 : v;
       };
-      spawnWave(s, noBossRng);
+      spawnWave(s, noEliteRng);
       expect(s.dungeon.monsters.length).toBeGreaterThanOrEqual(2);
       expect(s.dungeon.monsters.length).toBeLessThanOrEqual(4);
       const pool = new Set(MAP_DEFS[0].monsterPool);
       for (const m of s.dungeon.monsters) {
         expect(pool.has(m.monsterId)).toBe(true);
+        expect(m.elite).toBeUndefined();
       }
     }
   });
 
-  it('BOSS 波：注入 rng 强制触发，BOSS 居首 + 1~2 护卫', () => {
+  it('精英波：注入 rng 强制触发，精英居首 + 1~2 护卫 + 数值放大', () => {
     const s = freshState();
-    // rng 消耗顺序：isBoss(0.01) → guards(0.99→2 只) → bossPick(0→slime_king) → 护卫×2(0.5)
-    spawnWave(s, fakeRng([0.01, 0.99, 0, 0.5, 0.5]));
+    // rng 消耗顺序：isElite(0.01) → elitePick(0→e1_warrior 苔藓兽王) → guards(0.99→2 只) → 护卫×2(0.5)
+    spawnWave(s, fakeRng([0.01, 0, 0.99, 0.5, 0.5]));
     expect(s.dungeon.monsters.length).toBe(3);
-    expect(MAP_DEFS[0].bossPool).toContain(s.dungeon.monsters[0].monsterId);
-    const bossStart = s.events.find((e) => e.kind === 'waveStart');
-    expect(bossStart).toMatchObject({ kind: 'waveStart', isBoss: true });
+    const elite = s.dungeon.monsters[0];
+    expect(elite.elite).toBeDefined();
+    expect(elite.elite!.sigil).toBe('warrior');
+    const baseDef = MONSTERS[elite.monsterId];
+    expect(elite.maxHp).toBe(Math.round(baseDef.base.hp * BALANCE.ELITE_HP_MULT)); // hp ×2.2
+    expect(s.events.find((e) => e.kind === 'waveStart')).toMatchObject({
+      kind: 'waveStart',
+      isElite: true,
+    });
+    // 护卫无精英标记
+    expect(s.dungeon.monsters.slice(1).every((m) => m.elite === undefined)).toBe(true);
   });
 
   it('无限循环：清波后波次持续推进（无总波数上限）', () => {
@@ -357,17 +400,20 @@ describe('羁绊与光环', () => {
 });
 
 describe('推图与解锁', () => {
-  it('首杀本图 BOSS：声望一次性 + 解锁下一张图', () => {
+  it('首次讨伐本图精英：声望一次性 + 解锁下一张图 + 徽记/魔核掉落', () => {
     const s = freshState();
     s.roster[0].level = 8;
     s.roster[0].hp = getAdventurerStats(s, s.roster[0]).hp;
-    // 强制 BOSS 波（slime_king + 2 护卫）
-    spawnWave(s, fakeRng([0.01, 0.99, 0, 0.5, 0.5]));
-    tickN(s, 60, 3);
-    expect(s.meta.totalBossKills).toBeGreaterThanOrEqual(1);
+    // 强制精英波（e1_warrior 苔藓兽王 base wolf_alpha + 2 护卫）
+    spawnWave(s, fakeRng([0.01, 0, 0.99, 0.5, 0.5]));
+    tickN(s, 120, 3);
+    expect(s.meta.totalBossKills).toBeGreaterThanOrEqual(1); // 语义 = 精英击杀
     expect(s.player.reputation).toBe(MAP_DEFS[0].firstClearReputation);
     expect(s.dungeon.unlockedMaps).toBe(2);
     expect(s.meta.mapsFirstCleared).toContain(1);
+    // 精英掉落：战士徽记 + 图1 魔核（苔藓古树心）
+    expect(s.inventory['mat_sigil_warrior']).toBeGreaterThanOrEqual(1);
+    expect(s.inventory['mat_elite_core_1']).toBeGreaterThanOrEqual(1);
   });
 
   it('setActiveMap：解锁范围内切换生效，未解锁/越界拒绝', () => {
@@ -475,11 +521,25 @@ describe('D&D 升级仪式', () => {
     const r = useGameStore.getState().levelUpAdventurer('adv_hank');
     expect(r.ok).toBe(true);
     const after = useGameStore.getState().state;
+    const cost = levelUpCost(2, 'warrior')!;
     expect(after.roster[0].level).toBe(2);
     expect(after.roster[0].exp).toBe(0);
-    expect(after.player.gold).toBe(9999 - LEVEL_UP_COST[0].gold);
-    expect(after.inventory['mat_gel']).toBe(99 - (LEVEL_UP_COST[0].materials.mat_gel ?? 0));
+    expect(after.player.gold).toBe(9999 - cost.gold);
+    expect(after.inventory['mat_gel']).toBe(99 - (cost.materials.mat_gel ?? 0));
     expect(after.events.some((e) => e.kind === 'levelup')).toBe(true);
+  });
+
+  it('升级费用曲线：2-3 级普通掉落，4-8 级职业徽记+对应图魔核，9/10 返回 null', () => {
+    expect(levelUpCost(2, 'warrior')!.materials).toEqual({ mat_gel: 10 });
+    expect(levelUpCost(3, 'warrior')!.materials).toEqual({ mat_carapace: 8 });
+    const c4 = levelUpCost(4, 'mage')!;
+    expect(c4.materials.mat_sigil_mage).toBe(1);
+    expect(c4.materials.mat_elite_core_1).toBe(3); // 升到 4 级 ← 图1 精英魔核
+    const c8 = levelUpCost(8, 'rogue')!;
+    expect(c8.materials.mat_sigil_rogue).toBe(3);
+    expect(c8.materials.mat_elite_core_5).toBe(7); // 升到 8 级 ← 图5
+    expect(levelUpCost(9, 'warrior')).toBeNull();
+    expect(levelUpCost(10, 'warrior')).toBeNull();
   });
 
   it('经验不足 / 材料不足 / 10 级封顶 均拒绝', () => {
@@ -501,6 +561,17 @@ describe('D&D 升级仪式', () => {
     const r3 = useGameStore.getState().levelUpAdventurer('adv_hank');
     expect(r3.ok).toBe(false);
     expect(r3.message).toContain('传奇');
+  });
+
+  it('9、10 级仪式暂未开放：8 级经验满也拒绝（UPGRADE_CAP）', () => {
+    const s = freshState();
+    s.roster[0].level = BALANCE.UPGRADE_CAP;
+    s.roster[0].exp = 99999;
+    s.player.gold = 999999;
+    setStoreState(s);
+    const r = useGameStore.getState().levelUpAdventurer('adv_hank');
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain('暂未开放');
   });
 
   it('等级档位：Lv10 传奇、Lv5 资深、Lv1 学徒', () => {
@@ -568,57 +639,89 @@ describe('日薪与忠诚度', () => {
   });
 });
 
-describe('菜谱与厨房', () => {
-  it('烹饪完成 → buff 生效 + 全员忠诚；到期消散', () => {
+describe('菜谱与厨房（v7 菜单制）', () => {
+  it('设置菜单并供给：效果即时生效，每小时消耗材料并出餐', () => {
     const s = freshState();
     freezeCombat(s);
-    const recipe = RECIPES.recipe_gel_soup!;
-    s.kitchen.job = { recipeId: recipe.id, remainingS: 2, totalS: recipe.cookTimeS };
-    const loyalty0 = s.roster[0].loyalty;
-    const atk0 = getAdventurerStats(s, s.roster[0]).atk;
-    tickN(s, 2, 81);
-    expect(s.kitchen.job).toBeNull();
-    expect(s.kitchen.buffs.length).toBe(1);
+    s.roster[0].level = 5; // 提高级别避免低攻取整吃掉 +25%
+    s.roster[0].hp = getAdventurerStats(s, s.roster[0]).hp;
+    s.inventory['mat_gel'] = 10;
+    const atk0 = getAdventurerStats(s, s.roster[0]).atk; // 基线（设菜单前）
+    s.kitchen.menu[0] = 'recipe_gel_soup'; // 凝胶浓汤：gel×3/小时，ATK +25%
+    s.kitchen.menuFed[0] = true;
+    // 厨房 0 级无结构要求 → 立即生效
+    expect(activeMenuRecipes(s)).toEqual(['recipe_gel_soup']);
     expect(getAdventurerStats(s, s.roster[0]).atk).toBeGreaterThan(atk0);
-    expect(s.roster[0].loyalty).toBe(Math.min(100, loyalty0 + recipe.mealLoyalty));
-    tickN(s, recipe.buff.durationS + 2, 81);
-    expect(s.kitchen.buffs.length).toBe(0);
-    expect(getAdventurerStats(s, s.roster[0]).atk).toBe(atk0);
+    // 供给周期：消耗 gel×3，出餐计数，忠诚回复
+    const loyalty0 = s.roster[0].loyalty;
+    runMenuCycle(s);
+    expect(s.kitchen.menuFed[0]).toBe(true);
+    expect(s.inventory['mat_gel']).toBe(10 - 3);
+    expect(s.meta.dishesCooked).toBe(1);
+    expect(s.roster[0].loyalty).toBe(Math.min(100, loyalty0 + BALANCE.MENU_LOYALTY_PER_CYCLE));
   });
 
-  it('厨房等级 0 → 同时生效上限 1 道，旧效果下架', () => {
+  it('缺料 → 槽位暂停供给，效果随之失效', () => {
     const s = freshState();
     freezeCombat(s);
-    expect(s.tavern.kitchen).toBe(0);
-    s.kitchen.job = { recipeId: 'recipe_gel_soup', remainingS: 1, totalS: 600 };
-    tickN(s, 1, 82);
-    expect(s.kitchen.buffs.length).toBe(1);
-    s.kitchen.job = { recipeId: 'recipe_mushroom_soup', remainingS: 1, totalS: 900 };
-    tickN(s, 1, 82);
-    expect(s.kitchen.buffs.length).toBe(1);
-    expect(s.kitchen.buffs[0].recipeId).toBe('recipe_mushroom_soup');
+    s.inventory['mat_gel'] = 0;
+    s.kitchen.menu[0] = 'recipe_gel_soup';
+    s.kitchen.menuFed[0] = true; // 上一周期供给过（生效中）
+    expect(activeMenuRecipes(s)).toEqual(['recipe_gel_soup']);
+    runMenuCycle(s);
+    expect(s.kitchen.menuFed[0]).toBe(false);
+    expect(activeMenuRecipes(s)).toEqual([]);
   });
 
-  it('首杀图1 BOSS 解锁 mapClear 菜谱', () => {
+  it('厨房 1 级结构要求：前菜+主菜+饮品 覆盖才生效', () => {
+    const s = freshState();
+    freezeCombat(s);
+    s.tavern.kitchen = 1;
+    s.kitchen.unlockedRecipes.push('recipe_beast_roast'); // 主菜（mapClear:1）
+    // gel_soda（饮品）与 bat_wings（前菜）为初始解锁
+    s.kitchen.menu[0] = 'recipe_bat_wings';
+    s.kitchen.menu[1] = 'recipe_beast_roast';
+    s.kitchen.menuFed[0] = true;
+    s.kitchen.menuFed[1] = true;
+    expect(activeMenuRecipes(s)).toEqual([]); // 缺饮品 → 整体暂停
+    s.kitchen.menu[2] = 'recipe_gel_soda';
+    s.kitchen.menuFed[2] = true;
+    expect(activeMenuRecipes(s).length).toBe(3); // 结构满足 → 全部生效
+  });
+
+  it('首杀图1精英解锁 mapClear 菜谱', () => {
     const s = freshState();
     s.meta.mapsFirstCleared = [1, 2];
     tickN(s, 1, 83);
     expect(s.kitchen.unlockedRecipes).toContain('recipe_carapace_chips'); // mapClear: 1
   });
+
+  it('store.setMenuSlot：上菜即尝试供给（足料立即生效 / 缺料暂停 / 重复拒绝）', () => {
+    const s = freshState();
+    freezeCombat(s);
+    s.inventory['mat_gel'] = 3;
+    setStoreState(s);
+    const r = useGameStore.getState().setMenuSlot(0, 'recipe_gel_soup');
+    expect(r.ok).toBe(true);
+    const after = useGameStore.getState().state;
+    expect(after.kitchen.menu[0]).toBe('recipe_gel_soup');
+    expect(after.kitchen.menuFed[0]).toBe(true);
+    expect(after.inventory['mat_gel']).toBe(0); // 上菜即扣一次供给
+    // 同菜不能重复上菜单
+    expect(useGameStore.getState().setMenuSlot(1, 'recipe_gel_soup').ok).toBe(false);
+    // 缺料上菜 → 暂停态
+    const r2 = useGameStore.getState().setMenuSlot(1, 'recipe_bat_wings');
+    expect(r2.ok).toBe(true);
+    expect(useGameStore.getState().state.kitchen.menuFed[1]).toBe(false);
+  });
 });
 
 describe('经验获取', () => {
-  it('经验菜肴 buff 放大击杀经验', () => {
+  it('经验菜肴（菜单供给中）放大击杀经验', () => {
     const a = freshState();
     const b = freshState();
-    b.kitchen.buffs.push({
-      recipeId: 'recipe_mush_wine',
-      label: '经验获取 +30%',
-      stat: 'expGain',
-      mult: 1.3,
-      remainingS: 9999,
-      totalS: 9999,
-    });
+    b.kitchen.menu[0] = 'recipe_mush_wine'; // 经验获取 +35%
+    b.kitchen.menuFed[0] = true;
     tickN(a, 40, 95);
     tickN(b, 40, 95);
     expect(b.meta.lifetimeExpEarned).toBeGreaterThan(a.meta.lifetimeExpEarned);
@@ -646,7 +749,7 @@ describe('掉落', () => {
 });
 
 describe('v4 图鉴计数', () => {
-  it('击杀魔物计入 meta.monsterKills（按种类累计）', () => {
+  it('击杀魔物计入 meta.monsterKills（按种类累计；精英计入借用魔物）', () => {
     const s = freshState();
     expect(s.meta.monsterKills).toEqual({});
     tickN(s, 60, 21);
@@ -654,16 +757,17 @@ describe('v4 图鉴计数', () => {
     expect(discoveredMonsterCount(s)).toBeGreaterThan(0);
   });
 
-  it('出餐一次计入 meta.dishesCooked', () => {
+  it('菜单供给出餐计入 meta.dishesCooked（每小时每道菜）', () => {
     const s = freshState();
     freezeCombat(s);
-    const recipe = RECIPES.recipe_gel_soup!;
-    s.kitchen.job = { recipeId: recipe.id, remainingS: 1, totalS: recipe.cookTimeS };
-    tickN(s, 1, 81);
+    s.inventory['mat_gel'] = 10;
+    s.kitchen.menu[0] = 'recipe_gel_soup';
+    s.kitchen.menuFed[0] = false;
+    runMenuCycle(s);
     expect(s.meta.dishesCooked).toBe(1);
-    s.kitchen.job = { recipeId: recipe.id, remainingS: 1, totalS: recipe.cookTimeS };
-    tickN(s, 1, 81);
+    runMenuCycle(s);
     expect(s.meta.dishesCooked).toBe(2);
+    expect(s.inventory['mat_gel']).toBe(10 - 6);
   });
 });
 
