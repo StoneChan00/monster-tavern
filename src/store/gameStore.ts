@@ -26,6 +26,10 @@ interface GameStore {
   state: GameState;
   offlineReport: OfflineReport | null;
   clockWarning: boolean;
+  /** 首次团灭资助引导弹窗（UI 瞬态：引擎发放资助的瞬间打开） */
+  firstWipeGuideOpen: boolean;
+  /** 招待区面板引导高亮（资助弹窗跳转 / 酒馆地图招待区房间点击） */
+  recruitHighlight: boolean;
   /** 常规推进（在线，每 1~60s） */
   tick: (seconds: number) => void;
   /** 长空白补算（切页签返回/离线登录），走离线效率折算 */
@@ -39,10 +43,26 @@ interface GameStore {
   assignToSlot: (slot: number, adventurerId: string | null) => ActionResult;
   setActiveMap: (mapNumber: number) => ActionResult;
   dismissOfflineReport: () => void;
+  dismissFirstWipeGuide: () => void;
+  /** 引导跳转招募：点亮招待区面板（4s 后自动熄灭） */
+  beginRecruitGuide: () => void;
+  clearRecruitHighlight: () => void;
   saveNow: () => void;
   exportSaveString: () => string;
   importSaveString: (raw: string) => ActionResult;
   hardReset: () => void;
+}
+
+/**
+ * 首次团灭资助检测：引擎在 tick/离线路径里就地翻转 wipeSubsidyClaimed，
+ * 调用方在推进前后各快照一次，捕捉 false→true 跃迁即可打开引导弹窗
+ * （在线 tick / 切页签 catchUp / 载入存档 initStore 三条路径全覆盖）。
+ */
+function wipeSubsidyFlipped(
+  state: GameState,
+  claimedBefore: boolean,
+): Partial<Pick<GameStore, 'firstWipeGuideOpen'>> {
+  return !claimedBefore && state.meta.wipeSubsidyClaimed ? { firstWipeGuideOpen: true } : {};
 }
 
 let initialized = false;
@@ -81,6 +101,7 @@ export function initStore(): void {
   if (!state) state = createInitialState();
 
   const awaySeconds = (Date.now() - state.meta.lastSavedAt) / 1000;
+  const subsidyBefore = state.meta.wipeSubsidyClaimed;
   const result = applyOffline(state, awaySeconds);
   const showReport = result.report !== null && awaySeconds > BALANCE.WELCOME_BACK_THRESHOLD_S;
 
@@ -92,6 +113,7 @@ export function initStore(): void {
     state,
     offlineReport: showReport ? result.report : null,
     clockWarning: result.clockTampered,
+    ...wipeSubsidyFlipped(state, subsidyBefore),
   });
 }
 
@@ -132,16 +154,20 @@ export const useGameStore = create<GameStore>()((set, get) => ({
   state: createInitialState(),
   offlineReport: null,
   clockWarning: false,
+  firstWipeGuideOpen: false,
+  recruitHighlight: false,
 
   tick: (seconds) => {
     if (seconds <= 0) return;
     const s = get().state;
+    const subsidyBefore = s.meta.wipeSubsidyClaimed;
     engineTick(s, seconds);
-    set({ state: { ...s } });
+    set({ state: { ...s }, ...wipeSubsidyFlipped(s, subsidyBefore) });
   },
 
   catchUp: (gapSeconds) => {
     const s = get().state;
+    const subsidyBefore = s.meta.wipeSubsidyClaimed;
     const result = applyOffline(s, gapSeconds);
     const pending = get().offlineReport;
     const fresh =
@@ -153,6 +179,7 @@ export const useGameStore = create<GameStore>()((set, get) => ({
       // 导致 initStore 刚设置的弹窗"闪一下消失"。
       offlineReport: pending ?? fresh,
       clockWarning: result.clockTampered || get().clockWarning,
+      ...wipeSubsidyFlipped(s, subsidyBefore),
     });
   },
 
@@ -326,6 +353,12 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
   dismissOfflineReport: () => set({ offlineReport: null, clockWarning: false }),
 
+  dismissFirstWipeGuide: () => set({ firstWipeGuideOpen: false }),
+
+  beginRecruitGuide: () => set({ recruitHighlight: true }),
+
+  clearRecruitHighlight: () => set({ recruitHighlight: false }),
+
   saveNow: () => {
     const s = get().state;
     s.meta.lastSavedAt = Date.now();
@@ -343,13 +376,13 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     if (!state) return { ok: false, message: '存档文件无效' };
     state.meta.lastSavedAt = Date.now();
     pushLog(state, 'system', '📥 存档已导入。');
-    set({ state, offlineReport: null, clockWarning: false });
+    set({ state, offlineReport: null, clockWarning: false, firstWipeGuideOpen: false, recruitHighlight: false });
     return { ok: true, message: '导入成功' };
   },
 
   hardReset: () => {
     localStorageAdapter.clear();
     const state = createInitialState();
-    set({ state, offlineReport: null, clockWarning: false });
+    set({ state, offlineReport: null, clockWarning: false, firstWipeGuideOpen: false, recruitHighlight: false });
   },
 }));

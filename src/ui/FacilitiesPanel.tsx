@@ -4,15 +4,17 @@ import { useGameStore } from '../store/gameStore';
 import { FACILITIES, type FacilityDef } from '../data/upgrades';
 import { MATERIALS } from '../data/materials';
 
-/** 酒馆页签：五大设施升级 */
+/** 酒馆页签：在营设施升级（训练场/情报网已下架，注册表自动过滤） */
 export function FacilitiesPanel() {
   return (
     <div className="space-y-3">
       <Panel title="酒馆设施" icon="🍺">
         <div className="space-y-2">
-          {Object.values(FACILITIES).map((f) => (
-            <FacilityCard key={f.id} facility={f} />
-          ))}
+          {Object.values(FACILITIES)
+            .filter((f): f is FacilityDef => f !== undefined)
+            .map((f) => (
+              <FacilityCard key={f.id} facility={f} />
+            ))}
         </div>
       </Panel>
     </div>

@@ -1,5 +1,9 @@
 import type { MaterialId } from '../engine/types';
 
+/**
+ * 设施槽位 id。训练场/情报网已从酒馆下架（FACILITIES 不再收录），
+ * 但 id 与 state.tavern 字段保留：旧档的既有等级/加成原样生效，仅不可再升级。
+ */
 export type FacilityId = 'trainingGround' | 'lounge' | 'kitchen' | 'dorm' | 'intel';
 
 export interface UpgradeCost {
@@ -18,19 +22,6 @@ export interface FacilityDef {
   /** 从 level 升到 level+1 的花费 */
   cost: (level: number) => UpgradeCost;
 }
-
-/** 训练场：每级 全属性 +8%（D&D 制等级上限固定 10，训练只涨属性） */
-export const TRAINING_GROUND: FacilityDef = {
-  id: 'trainingGround',
-  name: '训练场',
-  icon: '🏹',
-  describe: (lv) => `全队属性 +${lv * 8}%`,
-  maxLevel: 5,
-  cost: (lv) => ({
-    gold: [50, 120, 300, 750, 1800][lv],
-    materials: { mat_carapace: [3, 6, 10, 15, 21][lv] },
-  }),
-};
 
 /** 招待区：每级 替补席 +1；每 2 级到访批次 +1 */
 export const LOUNGE: FacilityDef = {
@@ -75,24 +66,10 @@ export const DORM: FacilityDef = {
   }),
 };
 
-/** 情报网：掉落预览可查地图数 = 1 + 等级 */
-export const INTEL: FacilityDef = {
-  id: 'intel',
-  name: '情报网',
-  icon: '🗺️',
-  describe: (lv) => `可查询 ${1 + lv} 张地图的魔物与掉落情报`,
-  maxLevel: 4,
-  cost: (lv) => ({
-    gold: [100, 250, 600, 1500][lv],
-    reputation: [10, 20, 35, 50][lv],
-    materials: {},
-  }),
-};
-
-export const FACILITIES: Record<FacilityId, FacilityDef> = {
-  trainingGround: TRAINING_GROUND,
+/** 在营设施注册表（酒馆页签展示 + 升级入口）。
+ *  已下架：训练场（训练场加成仍按 state.tavern.trainingGround 生效于旧档）、情报网。 */
+export const FACILITIES: Partial<Record<FacilityId, FacilityDef>> = {
   lounge: LOUNGE,
   kitchen: KITCHEN,
   dorm: DORM,
-  intel: INTEL,
 };
