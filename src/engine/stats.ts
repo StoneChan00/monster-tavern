@@ -1,4 +1,4 @@
-import { BALANCE, menuConfig } from '../data/balance';
+import { BALANCE, MENU_CONFIG, menuConfig } from '../data/balance';
 import { BARD_AURA, CLASSES } from '../data/classes';
 import { activeBonds } from '../data/bonds';
 import { RECIPES } from '../data/recipes';
@@ -37,25 +37,56 @@ export function adventurerLevelCap(_trainingGroundLevel: number): number {
 
 /**
  * 菜单生效的菜品（v7 菜单制）：
- * - 槽位已设菜且该槽最近一次小时供给足料（menuFed）
- * - 厨房 1 级起菜单需覆盖必需类别（前菜/主菜/饮品…），结构不满足则全部暂停生效
+ * 槽位已设菜且该槽最近一次小时供给足料（menuFed）。
+ * 菜品效果**独立生效**，无结构门控；结构满足只提供额外加成（见 activeMenuStructures）。
  */
 export function activeMenuRecipes(state: GameState): string[] {
   const cfg = menuConfig(state.tavern.kitchen);
   const dishes: string[] = [];
-  const cats = new Set<string>();
   for (let i = 0; i < state.kitchen.menu.length && i < cfg.slots; i++) {
     const id = state.kitchen.menu[i];
     if (!id || !state.kitchen.menuFed[i]) continue;
-    const r = RECIPES[id];
-    if (!r) continue;
-    dishes.push(id);
-    cats.add(r.category);
-  }
-  if (cfg.required.length > 0 && !cfg.required.every((c) => cats.has(c))) {
-    return []; // 结构不满足 → 菜单整体暂停生效
+    if (RECIPES[id]) dishes.push(id);
   }
   return dishes;
+}
+
+/** 供料中菜品覆盖的类别集合 */
+function fedMenuCategories(state: GameState): Set<string> {
+  const cats = new Set<string>();
+  for (const id of activeMenuRecipes(state)) {
+    const r = RECIPES[id];
+    if (r) cats.add(r.category);
+  }
+  return cats;
+}
+
+/**
+ * 满足结构的等级列表（嵌套叠加）：
+ * 供料菜单覆盖该级必需类别 → 该级结构加成生效。
+ * 高级结构类别要求包含低级 → 满足高级自动满足低级，效果叠加。
+ */
+export function activeMenuStructures(state: GameState): number[] {
+  const cats = fedMenuCategories(state);
+  const result: number[] = [];
+  for (let lv = 1; lv <= 4; lv++) {
+    const cfg = MENU_CONFIG[lv];
+    if (cfg.required.every((c) => cats.has(c))) result.push(lv);
+  }
+  return result;
+}
+
+/** 结构加成乘区（statMult / expMult / dropMult） */
+function structureMult(state: GameState, key: 'statMult' | 'expMult' | 'dropMult'): number {
+  return activeMenuStructures(state).reduce((m, lv) => {
+    const v = MENU_CONFIG[lv].bonus[key];
+    return v ? m * v : m;
+  }, 1);
+}
+
+/** 每次供给周期的结构额外忠诚（1 级结构「温饱套餐」） */
+export function menuLoyaltyBonus(state: GameState): number {
+  return activeMenuStructures(state).reduce((sum, lv) => sum + (MENU_CONFIG[lv].bonus.loyaltyBonus ?? 0), 0);
 }
 
 /** 全局菜肴 buff：生效菜单中同属性多道取最强 */
@@ -111,6 +142,7 @@ export function getAdventurerStats(state: GameState, adv: AdventurerState): Base
           trainMult *
           loyaltyMult *
           dishBuffMult(state, stat) *
+          structureMult(state, 'statMult') *
           partyMult,
       ),
     );
@@ -123,16 +155,16 @@ export function getAdventurerStats(state: GameState, adv: AdventurerState): Base
   };
 }
 
-/** 队伍掉落率乘区（菜肴 dropRate buff × 羁绊掉率） */
+/** 队伍掉落率乘区（菜肴 dropRate buff × 羁绊掉率 × 结构加成） */
 export function getPartyDropMult(state: GameState): number {
-  let m = dishBuffMult(state, 'dropRate');
+  let m = dishBuffMult(state, 'dropRate') * structureMult(state, 'dropMult');
   for (const b of activeBonds(alivePartyClasses(state))) {
     if (b.effect.stat === 'dropRate') m *= b.effect.mult;
   }
   return m;
 }
 
-/** 队伍经验乘区（菜肴 expGain buff） */
+/** 队伍经验乘区（菜肴 expGain buff × 结构加成） */
 export function getPartyExpMult(state: GameState): number {
-  return dishBuffMult(state, 'expGain');
+  return dishBuffMult(state, 'expGain') * structureMult(state, 'expMult');
 }

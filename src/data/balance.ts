@@ -170,20 +170,54 @@ export function levelUpCost(targetLevel: number, classId: ClassId): LevelUpCostD
   }
 }
 
-/** 厨房菜单结构：等级 → 槽位数 + 必需类别（满足结构菜单效果才生效；0 级无要求） */
+/**
+ * 厨房菜单结构：等级 → 槽位数 + 必需类别 + 结构加成。
+ * 菜品效果随供料独立生效（无门控）；满足某级结构类别要求 → 该级结构加成生效。
+ * 类别要求累进（高级结构 ⊇ 低级），满足高级结构自动满足低级，**效果叠加**——
+ * 因此 4 级厨房 7 槽可同时触发 1-4 级全部结构加成；只摆 5 道满足 3 级结构时，
+ * 1/2/3 级加成同样全部生效。
+ */
+export interface MenuBonus {
+  /** 套餐名（UI 展示） */
+  name: string;
+  desc: string;
+  /** 全属性乘区（如 1.05 = +5%） */
+  statMult?: number;
+  /** 经验获取乘区 */
+  expMult?: number;
+  /** 掉落率乘区 */
+  dropMult?: number;
+  /** 每次供给周期的额外忠诚回复（全员） */
+  loyaltyBonus?: number;
+}
+
 export interface MenuConfig {
   slots: number;
   required: RecipeCategory[];
+  bonus: MenuBonus;
 }
 
 export const MENU_CONFIG: Record<number, MenuConfig> = {
-  0: { slots: 2, required: [] },
-  1: { slots: 3, required: ['appetizer', 'main', 'drink'] },
-  2: { slots: 4, required: ['appetizer', 'side', 'main', 'drink'] },
-  3: { slots: 5, required: ['appetizer', 'soup', 'side', 'main', 'drink'] },
+  0: { slots: 2, required: [], bonus: { name: '', desc: '任意 2 道菜即可，结构加成待厨房升级解锁' } },
+  1: {
+    slots: 3,
+    required: ['appetizer', 'main', 'drink'],
+    bonus: { name: '温饱套餐', desc: '每次供给全员忠诚 +2', loyaltyBonus: 2 },
+  },
+  2: {
+    slots: 4,
+    required: ['appetizer', 'side', 'main', 'drink'],
+    bonus: { name: '丰盛套餐', desc: '全队属性 +5%', statMult: 1.05 },
+  },
+  3: {
+    slots: 5,
+    required: ['appetizer', 'soup', 'side', 'main', 'drink'],
+    bonus: { name: '盛宴', desc: '经验获取 +8%', expMult: 1.08 },
+  },
   4: {
     slots: 7,
     required: ['appetizer', 'soup', 'side', 'main', 'salad', 'dessert', 'drink'],
+    bonus: { name: '满汉全席', desc: '掉落率 +10%', dropMult: 1.1 },
   },
 };
 

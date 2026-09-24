@@ -1,8 +1,13 @@
-import { BALANCE, wageOfLevel } from '../data/balance';
+import { BALANCE, MENU_CONFIG, wageOfLevel } from '../data/balance';
 import { RECIPES } from '../data/recipes';
 import { CLASSES } from '../data/classes';
 import { resolveRound, spawnWave } from './combat';
-import { getAdventurerStats, activeMenuRecipes } from './stats';
+import {
+  activeMenuRecipes,
+  activeMenuStructures,
+  getAdventurerStats,
+  menuLoyaltyBonus,
+} from './stats';
 import { pushEvent, pushLog } from './log';
 import { generateVisitors } from './recruitment';
 import { getPartyMembers } from './party';
@@ -107,19 +112,25 @@ export function runMenuCycle(state: GameState): void {
   }
   if (okCount > 0) {
     state.meta.dishesCooked += okCount;
-    // 供给成功 → 全员用餐忠诚回复
+    // 供给成功 → 全员用餐忠诚回复（含结构加成，如 1 级「温饱套餐」+2）
+    const loyaltyGain = BALANCE.MENU_LOYALTY_PER_CYCLE + menuLoyaltyBonus(state);
     for (const a of state.roster) {
-      a.loyalty = Math.min(100, a.loyalty + BALANCE.MENU_LOYALTY_PER_CYCLE);
+      a.loyalty = Math.min(100, a.loyalty + loyaltyGain);
     }
     const okNames = state.kitchen.menu
       .filter((id, i) => id && state.kitchen.menuFed[i])
       .map((id) => `${RECIPES[id!]?.icon ?? '🍽️'}${RECIPES[id!]?.name ?? ''}`)
       .join('、');
+    const structs = activeMenuStructures(state);
+    const structText =
+      structs.length > 0
+        ? `，触发「${structs.map((lv) => MENU_CONFIG[lv].bonus.name).join('」「')}」`
+        : '';
     const failed = fedCount - okCount;
     pushLog(
       state,
       'kitchen',
-      `🍽️ 菜单供给：${okNames}${failed > 0 ? `（${failed} 道缺料暂停）` : ''}`,
+      `🍽️ 菜单供给：${okNames}${structText}${failed > 0 ? `（${failed} 道缺料暂停）` : ''}`,
     );
   } else {
     pushLog(state, 'kitchen', '⚠️ 菜单食材告罄——所有菜品暂停供给，去地牢囤点材料吧！');
