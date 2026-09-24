@@ -71,12 +71,18 @@ function fakeRng(seq: number[]): () => number {
 }
 
 function setStoreState(s: GameState): void {
-  useGameStore.setState({ state: s, offlineReport: null, clockWarning: false });
+  useGameStore.setState({
+    state: s,
+    offlineReport: null,
+    clockWarning: false,
+    firstWipeGuideOpen: false,
+    recruitHighlight: false,
+  });
 }
 
 // ────────────────────────────────────────────
 
-describe('初始状态 v5', () => {
+describe('初始状态 v6', () => {
   it('开局：汉克(Lv1 学徒) + 单人编队 + 2 道初始菜谱 + 60 金币 + 苔藓洞窟', () => {
     const s = freshState();
     expect(s.roster.length).toBe(1);
@@ -90,12 +96,13 @@ describe('初始状态 v5', () => {
     expect(s.kitchen.unlockedRecipes).toContain('recipe_gel_soup');
     expect(s.kitchen.unlockedRecipes).toContain('recipe_bat_wings');
     expect(s.player.gold).toBe(60);
+    expect(s.meta.wipeSubsidyClaimed).toBe(false); // 首次团灭资助未领取
     expect(s.version).toBe(SAVE_VERSION);
-    expect(SAVE_VERSION).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
   });
 });
 
-describe('存档迁移链（v1 → v5）', () => {
+describe('存档迁移链（v1 → v6）', () => {
   it('Phase 0 存档完整升级：进度保留、种族补齐、等级折叠、地图重建', () => {
     const v1 = {
       version: 1,
@@ -129,7 +136,7 @@ describe('存档迁移链（v1 → v5）', () => {
     const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 1, state: v1, exportedAt: 1 });
     const loaded = deserialize(raw);
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(5);
+    expect(loaded!.version).toBe(6);
     expect(loaded!.roster[0].name).toBe('铁胃汉克');
     expect(loaded!.roster[0].race).toBe('human'); // v3 补种族
     // v5 等级折叠：common(保底 1) + 旧 4 级 → ceil(4/3.5)=2
@@ -166,7 +173,7 @@ describe('存档迁移链（v1 → v5）', () => {
     const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 4, state: v4Like, exportedAt: 1 });
     const loaded = deserialize(raw);
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(5);
+    expect(loaded!.version).toBe(6);
     // epic(保底 4) + 旧 20 级 → ceil(20/3.5)=6
     expect(loaded!.roster[0].level).toBe(6);
     expect(loaded!.roster[0].exp).toBe(0);
@@ -177,6 +184,21 @@ describe('存档迁移链（v1 → v5）', () => {
     // floor_1/5/16 → 图 1/2/6
     expect(loaded!.meta.mapsFirstCleared).toEqual([1, 2, 6]);
     expect(loaded!.meta.monsterKills).toEqual({ slime: 9 }); // v4 图鉴保留
+  });
+
+  it('v5 存档升级 v6：补资助标记（未领取），其余字段原样保留', () => {
+    const s = freshState();
+    const v5Like = JSON.parse(JSON.stringify(s)) as Record<string, unknown>;
+    const meta = v5Like.meta as Record<string, unknown>;
+    delete meta.wipeSubsidyClaimed; // v5 无此字段
+    v5Like.version = 5;
+    const raw = JSON.stringify({ magic: 'monster-tavern-save', version: 5, state: v5Like, exportedAt: 1 });
+    const loaded = deserialize(raw);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.version).toBe(6);
+    expect(loaded!.meta.wipeSubsidyClaimed).toBe(false); // 旧档无团灭史 → 按未领取处理
+    expect(loaded!.player.gold).toBe(60);
+    expect(loaded!.roster[0].name).toBe('铁胃汉克');
   });
 
   it('serialize → deserialize 往返一致（v5，瞬态事件剥离）', () => {
@@ -900,21 +922,106 @@ describe('欢迎回来弹窗稳定性', () => {
 });
 
 describe('设施升级（store）', () => {
-  it('upgradeFacility：扣费升级；情报网声望门槛生效', () => {
+  it('upgradeFacility：扣费升级（招待区 80 金 + 4 甲壳）', () => {
     const s = freshState();
     s.player.gold = 500;
     s.inventory['mat_carapace'] = 10;
     setStoreState(s);
-    const r = useGameStore.getState().upgradeFacility('trainingGround');
+    const r = useGameStore.getState().upgradeFacility('lounge');
     expect(r.ok).toBe(true);
     const after = useGameStore.getState().state;
-    expect(after.tavern.trainingGround).toBe(1);
-    expect(after.player.gold).toBe(450);
+    expect(after.tavern.lounge).toBe(1);
+    expect(after.player.gold).toBe(500 - 80);
+    expect(after.inventory['mat_carapace']).toBe(10 - 4);
+  });
 
-    // 情报网需要声望 10
-    const intel = useGameStore.getState().upgradeFacility('intel');
-    expect(intel.ok).toBe(false);
-    expect(intel.message).toContain('声望');
+  it('已下架设施（训练场/情报网）：拒绝升级，旧档字段与加成原样保留', () => {
+    const s = freshState();
+    s.tavern.trainingGround = 2; // 旧档遗留等级（全属性 +16%）
+    setStoreState(s);
+    const tg = useGameStore.getState().upgradeFacility('trainingGround');
+    expect(tg.ok).toBe(false);
+    expect(tg.message).toContain('未知设施');
+    expect(useGameStore.getState().upgradeFacility('intel').ok).toBe(false);
+    // 存档字段不被清除/篡改
+    expect(useGameStore.getState().state.tavern.trainingGround).toBe(2);
+  });
+});
+
+describe('首次团灭应急资助（v6）', () => {
+  /** 确定性团灭：编队成员 hp=0 直接进入战斗回合 → 立即 onWiped（无战斗收入，便于精确断言） */
+  function forceWipe(s: GameState): void {
+    s.roster[0].hp = 0;
+    s.dungeon.status = 'combat';
+  }
+
+  it('首次团灭：发放金币+签约材料，标记已领，无客时立刻安排到访', () => {
+    const t0 = 1_700_000_000_000;
+    const s = createInitialState(t0);
+    forceWipe(s);
+    tickN(s, 1, 111);
+    expect(s.dungeon.status).toBe('resting');
+    expect(s.meta.wipeSubsidyClaimed).toBe(true);
+    // 初始 60 金 + 拨款 200（无战斗击杀，精确值）
+    expect(s.player.gold).toBe(60 + BALANCE.WIPE_SUBSIDY_GOLD);
+    expect(s.inventory['mat_carapace']).toBe(BALANCE.WIPE_SUBSIDY_MATERIALS.mat_carapace);
+    // 无客到访 → 下一批提前到 60 秒内（初始为 t0+180s，被提前到 t0+1s+60s）
+    expect(s.recruitment.nextVisitAt).toBe(t0 + 1000 + BALANCE.WIPE_SUBSIDY_VISIT_DELAY_MS);
+    expect(s.log.some((l) => l.text.includes('理事会'))).toBe(true);
+  });
+
+  it('已有客到访时不提前批次（引导直接可完成）', () => {
+    const t0 = 1_700_000_000_000;
+    const s = createInitialState(t0);
+    s.recruitment.visitors = [
+      {
+        uid: 9001,
+        name: '测试访客',
+        classId: 'warrior',
+        race: 'human',
+        level: 1,
+        costGold: 30,
+        costMaterial: { materialId: 'mat_carapace', count: 3 },
+      },
+    ];
+    forceWipe(s);
+    tickN(s, 1, 111);
+    expect(s.meta.wipeSubsidyClaimed).toBe(true);
+    expect(s.recruitment.nextVisitAt).toBe(t0 + 180_000); // 保持原批次计划
+    expect(s.recruitment.visitors).toHaveLength(1); // 访客未被替换
+  });
+
+  it('二次团灭不重复发放', () => {
+    const s = freshState();
+    forceWipe(s);
+    tickN(s, 1, 111);
+    const goldAfterFirst = s.player.gold;
+    const carapaceAfterFirst = s.inventory['mat_carapace'];
+    forceWipe(s);
+    tickN(s, 1, 111);
+    expect(s.player.gold).toBe(goldAfterFirst);
+    expect(s.inventory['mat_carapace']).toBe(carapaceAfterFirst);
+    expect(s.log.filter((l) => l.text.includes('理事会'))).toHaveLength(1);
+  });
+
+  it('store.tick 捕捉资助跃迁 → 打开引导弹窗；关闭后不再弹出', () => {
+    const s = freshState();
+    forceWipe(s);
+    setStoreState(s);
+    expect(useGameStore.getState().firstWipeGuideOpen).toBe(false);
+    useGameStore.getState().tick(1);
+    expect(useGameStore.getState().firstWipeGuideOpen).toBe(true);
+    useGameStore.getState().dismissFirstWipeGuide();
+    useGameStore.getState().tick(1);
+    expect(useGameStore.getState().firstWipeGuideOpen).toBe(false);
+  });
+
+  it('store.catchUp（离线路径团灭）同样打开引导弹窗', () => {
+    const s = freshState();
+    forceWipe(s);
+    setStoreState(s);
+    useGameStore.getState().catchUp(2);
+    expect(useGameStore.getState().firstWipeGuideOpen).toBe(true);
   });
 });
 
