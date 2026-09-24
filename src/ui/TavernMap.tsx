@@ -1,6 +1,5 @@
 import { Panel } from './Panel';
 import { useGameStore } from '../store/gameStore';
-import { RECIPES } from '../data/recipes';
 import { fmtDuration, fmtNum } from '../utils/format';
 
 /**
@@ -23,9 +22,11 @@ export function TavernMap({
 }) {
   const s = useGameStore((st) => st.state);
   const resting = s.dungeon.status === 'resting';
-  const job = s.kitchen.job;
   const visitorCount = s.recruitment.visitors.length;
   const nextIn = Math.max(0, (s.recruitment.nextVisitAt - s.meta.now) / 1000);
+  const menuNext = Math.max(0, (s.kitchen.nextMenuCycleAt - s.meta.now) / 1000);
+  const menuDishes = s.kitchen.menu.filter((x) => x !== null).length;
+  const menuActive = s.kitchen.menuFed.filter(Boolean).length;
 
   // 招待区：点亮到访面板并滚动定位（同页签下方）
   const goLounge = () => {
@@ -70,12 +71,8 @@ export function TavernMap({
           icon="🍳"
           name="厨房"
           clickable
-          sub={`Lv.${s.tavern.kitchen} · 生效菜肴 ${s.kitchen.buffs.length} 道`}
-          status={
-            job
-              ? `🔥 烹饪「${RECIPES[job.recipeId]?.name ?? '菜肴'}」· 剩 ${fmtDuration(job.remainingS)}`
-              : '灶台空闲'
-          }
+          sub={`Lv.${s.tavern.kitchen} · 菜单 ${menuDishes} 道 · 供给中 ${menuActive}`}
+          status={`${menuDishes > 0 ? `⏱ 每小时供料 · 下次 ${fmtDuration(menuNext)}` : '菜单空置——设置菜品获得增益'}`}
           onClick={onOpenKitchen}
         />
         <Room

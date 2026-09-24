@@ -1,4 +1,4 @@
-import { Panel } from './Panel';
+﻿import { Panel } from './Panel';
 import { useGameStore } from '../store/gameStore';
 import { MONSTERS, MAP_DEFS } from '../data/monsters';
 import { MONSTER_SPRITES } from '../data/sprites';
@@ -29,7 +29,7 @@ export function CodexPanel() {
     { label: '累计经验', value: fmtNum(s.meta.lifetimeExpEarned) },
     { label: '累计击杀', value: fmtNum(kills) },
     { label: '清波次数', value: fmtNum(s.meta.totalWavesCleared) },
-    { label: 'BOSS 击杀', value: fmtNum(s.meta.totalBossKills) },
+    { label: '精英讨伐', value: fmtNum(s.meta.totalBossKills) },
     { label: '累计出餐', value: fmtNum(s.meta.dishesCooked) },
     { label: '已解锁地图', value: `${s.dungeon.unlockedMaps} / ${MAP_DEFS.length}` },
   ];

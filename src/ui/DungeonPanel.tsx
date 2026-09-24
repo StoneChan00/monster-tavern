@@ -31,18 +31,18 @@ const ROWS: Array<{ label: string; icon: string; slots: number[] }> = [
   { label: '后排', icon: '🏹', slots: [2] },
 ];
 
-/** 地牢面板：选图 / 队伍状态 / 魔物 / 战斗日志（地图制无限循环） */
+/** 地牢面板：选图 / 编队 / 队伍状态 / 魔物 / 战斗日志（精英怪体系） */
 export function DungeonPanel() {
   const s = useGameStore((st) => st.state);
   const map = MAPS[s.dungeon.mapId] ?? MAP_DEFS[0];
   const logs = [...s.log].reverse().slice(0, 14);
   const members = getPartyMembers(s);
-  const bossWave = map.bossPool.includes(s.dungeon.monsters[0]?.monsterId ?? '');
+  const eliteWave = s.dungeon.monsters[0]?.elite !== undefined;
 
   return (
     <div className="space-y-3">
       {/* 地图选择 */}
-      <Panel title="地牢地图（首杀本图 BOSS 解锁下一张）" icon="🗺️">
+      <Panel title="地牢地图（首次讨伐本图精英解锁下一张）" icon="🗺️">
         <div className="flex flex-wrap gap-1.5">
           {MAP_DEFS.map((m) => {
             const locked = m.number > s.dungeon.unlockedMaps;
@@ -61,7 +61,7 @@ export function DungeonPanel() {
                       ? 'cursor-not-allowed border-[#3a2d1e] bg-[#171008] text-[#5b4d3a]'
                       : 'border-[#3a2d1e] bg-[#1f1812] text-[#a89880] hover:bg-[#2b2118]'
                 }`}
-                title={locked ? '尚未解锁（首杀上一张图的 BOSS）' : m.name}
+                title={locked ? '尚未解锁（讨伐上一张图的精英）' : m.name}
               >
                 {locked ? '🔒' : m.icon} {MAP_LABEL[m.number - 1]}·{m.name}
                 {cleared ? ' ✓' : ''}
@@ -98,7 +98,7 @@ export function DungeonPanel() {
           <span className="flex flex-wrap items-baseline gap-x-2">
             {map.icon} {map.name}
             <span className="text-[10px] font-normal text-[#a89880]">
-              本图清波 {fmtNum(s.dungeon.waveCount)} · 累计 {fmtNum(s.meta.totalWavesCleared)} · BOSS 击杀{' '}
+              本图清波 {fmtNum(s.dungeon.waveCount)} · 累计 {fmtNum(s.meta.totalWavesCleared)} · 精英讨伐{' '}
               {s.meta.totalBossKills}
             </span>
           </span>
@@ -154,20 +154,19 @@ export function DungeonPanel() {
               s.dungeon.monsters.map((m) => {
                 const def = MONSTERS[m.monsterId];
                 const dead = m.hp <= 0;
-                const isBoss = map.bossPool.includes(m.monsterId);
+                const isElite = m.elite !== undefined;
                 return (
                   <div
                     key={m.uid}
                     className={`flex items-center gap-2 border-2 p-1.5 ${
-                      isBoss ? 'border-[#8a3a2a] bg-[#2a1512]' : 'border-[#3a2d1e] bg-[#1f1812]'
+                      isElite ? 'border-[#8a3a2a] bg-[#2a1512]' : 'border-[#3a2d1e] bg-[#1f1812]'
                     } ${dead ? 'opacity-40 grayscale' : ''}`}
                   >
-                    <MonsterSprite monsterId={m.monsterId} fallback={def.icon} size={isBoss ? 26 : 20} />
+                    <MonsterSprite monsterId={m.monsterId} fallback={def.icon} size={isElite ? 26 : 20} />
                     <div className="min-w-0 flex-1">
                       <div className="flex justify-between">
-                        <span className={isBoss ? 'font-bold text-[#f0d78c]' : ''}>
-                          {isBoss ? '👑 ' : ''}
-                          {def.name}
+                        <span className={isElite ? 'font-bold text-[#f0d78c]' : ''}>
+                          {isElite ? `👑 ${m.elite!.name}` : def.name}
                         </span>
                         <span className="tabular-nums text-[#a89880]">
                           {Math.max(0, m.hp)}/{m.maxHp}
@@ -183,9 +182,9 @@ export function DungeonPanel() {
 
           {/* 循环提示 */}
           <div className="text-center text-[10px] text-[#6b5d48]">
-            {bossWave
-              ? '👑 BOSS 波！击杀后可能解锁新地图'
-              : '魔物无限循环涌来，每波约 5% 概率遭遇 BOSS'}
+            {eliteWave
+              ? '👑 精英波！讨伐成功掉落职业徽记 + 本图魔核，首杀解锁新地图'
+              : '魔物无限循环涌来，每波约 5% 概率遭遇精英（六种职业徽记随机掉落）'}
           </div>
 
           {/* 战斗日志 */}

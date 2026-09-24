@@ -2,9 +2,9 @@ import { Panel } from './Panel';
 import { Bar } from './Bar';
 import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
+import { BALANCE, levelUpCost, wageOfLevel } from '../data/balance';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
-import { BALANCE, LEVEL_UP_COST, wageOfLevel } from '../data/balance';
 import { MATERIALS } from '../data/materials';
 import { expToNext, getAdventurerStats, levelTier } from '../engine/stats';
 import { LEVEL_CAP } from '../engine/types';
@@ -26,7 +26,9 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
   const rowLabel = inParty ? (ROW_LABEL[BALANCE.SLOT_ROWS[slot]] ?? '') : '';
   const wage = wageOfLevel(adv.level);
   const tier = levelTier(adv.level);
-  const cost = atCap ? null : LEVEL_UP_COST[adv.level - 1] ?? null;
+  // 升级仪式费用：2/3 级用普通掉落，3→8 级对应图 1-5 精英材料，9/10 暂未开放
+  const upgradeLocked = adv.level >= BALANCE.UPGRADE_CAP;
+  const cost = upgradeLocked || atCap ? null : levelUpCost(adv.level + 1, adv.classId);
 
   const canPay =
     cost !== null &&
@@ -111,6 +113,10 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
         {atCap ? (
           <div className="border-2 border-[#8a6d2f] bg-[#2a2115] p-1.5 text-center text-[11px] font-bold text-[#f0d78c]">
             ⭐ 10 级传奇——这个世界没有更强的了
+          </div>
+        ) : upgradeLocked ? (
+          <div className="border-2 border-[#3a2d1e] bg-[#1f1812] p-1.5 text-center text-[11px] font-bold text-[#a89880]">
+            🔒 9、10 级仪式暂未开放（当前上限 8 级，高等级只能靠稀有访客）
           </div>
         ) : expReady ? (
           <div className="space-y-1">

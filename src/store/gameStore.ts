@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BALANCE, LEVEL_UP_COST, kitchenSpeedMult, rosterCap } from '../data/balance';
+import { BALANCE, levelUpCost, menuConfig, rosterCap } from '../data/balance';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
 import { RECIPES } from '../data/recipes';
@@ -34,7 +34,8 @@ interface GameStore {
   tick: (seconds: number) => void;
   /** 长空白补算（切页签返回/离线登录），走离线效率折算 */
   catchUp: (gapSeconds: number) => void;
-  cook: (recipeId: RecipeId) => ActionResult;
+  /** 设置菜单槽位（立即尝试一次供给；null = 下架该菜） */
+  setMenuSlot: (slot: number, recipeId: RecipeId | null) => ActionResult;
   upgradeFacility: (facilityId: FacilityId) => ActionResult;
   signVisitor: (uid: number) => ActionResult;
   dismissAdventurer: (adventurerId: string) => ActionResult;
@@ -117,14 +118,20 @@ export function initStore(): void {
   });
 }
 
-/** 材料/金币消耗校验（设施升级与烹饪共用） */
+/** 材料/金币消耗校验（设施升级共用；菜单供给不含金币与菜谱门槛） */
 function canAfford(
   state: GameState,
-  cost: { gold: number; reputation?: number; materials: Partial<Record<string, number>> },
+  cost: { gold: number; reputation?: number; materials: Partial<Record<string, number>>; unlockedRecipes?: number },
 ): { ok: true } | { ok: false; message: string } {
   if (cost.gold > 0 && state.player.gold < cost.gold) return { ok: false, message: '金币不足' };
   if (cost.reputation && state.player.reputation < cost.reputation) {
     return { ok: false, message: `声望不足（需 ${cost.reputation}）` };
+  }
+  if (cost.unlockedRecipes && state.kitchen.unlockedRecipes.length < cost.unlockedRecipes) {
+    return {
+      ok: false,
+      message: `已解锁菜谱不足（需 ${cost.unlockedRecipes} 道，现有 ${state.kitchen.unlockedRecipes.length} 道）`,
+    };
   }
   for (const [mid, need] of Object.entries(cost.materials)) {
     if ((state.inventory[mid] ?? 0) < (need ?? 0)) {
@@ -183,24 +190,37 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     });
   },
 
-  cook: (recipeId) => {
+  setMenuSlot: (slot, recipeId) => {
     const s = get().state;
-    const recipe = RECIPES[recipeId];
-    if (!recipe) return { ok: false, message: '未知菜谱' };
-    if (s.kitchen.job) return { ok: false, message: '厨房正忙（一次只能炖一锅）' };
-    if (!s.kitchen.unlockedRecipes.includes(recipeId)) return { ok: false, message: '菜谱尚未解锁' };
-    const afford = canAfford(s, recipe.cost);
-    if (!afford.ok) return { ok: false, message: afford.message };
-    payCost(s, recipe.cost);
-    const speed = kitchenSpeedMult(s.tavern.kitchen);
-    s.kitchen.job = {
-      recipeId,
-      remainingS: recipe.cookTimeS / speed,
-      totalS: recipe.cookTimeS,
-    };
-    pushLog(s, 'kitchen', `🔥 开始烹饪「${recipe.name}」（约 ${Math.ceil(recipe.cookTimeS / speed / 60)} 分钟）`);
+    const cfg = menuConfig(s.tavern.kitchen);
+    if (slot < 0 || slot >= cfg.slots) return { ok: false, message: '无效菜单槽位' };
+    if (recipeId !== null) {
+      const recipe = RECIPES[recipeId];
+      if (!recipe) return { ok: false, message: '未知菜谱' };
+      if (!s.kitchen.unlockedRecipes.includes(recipeId)) return { ok: false, message: '菜谱尚未解锁' };
+      if (s.kitchen.menu.includes(recipeId)) return { ok: false, message: '这道菜已在菜单上' };
+      // 上菜即尝试一次供给（消耗一次材料，足料立即生效）
+      const afford = Object.entries(recipe.cost.materials).every(
+        ([mid, need]) => (s.inventory[mid] ?? 0) >= (need ?? 0),
+      );
+      s.kitchen.menu[slot] = recipeId;
+      if (afford) {
+        for (const [mid, need] of Object.entries(recipe.cost.materials)) {
+          s.inventory[mid] = (s.inventory[mid] ?? 0) - (need ?? 0);
+        }
+        s.kitchen.menuFed[slot] = true;
+        pushLog(s, 'kitchen', `${recipe.icon} 「${recipe.name}」上菜单并即刻开灶（${recipe.buff.label}）`);
+      } else {
+        s.kitchen.menuFed[slot] = false;
+        pushLog(s, 'kitchen', `${recipe.icon} 「${recipe.name}」上菜单——但材料不够，等待下个供给周期`);
+      }
+    } else {
+      s.kitchen.menu[slot] = null;
+      s.kitchen.menuFed[slot] = false;
+      pushLog(s, 'kitchen', '🍽️ 一道菜下架了菜单');
+    }
     set({ state: { ...s } });
-    return { ok: true, message: '开始烹饪' };
+    return { ok: true, message: '菜单已更新' };
   },
 
   upgradeFacility: (facilityId) => {
@@ -285,12 +305,15 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const adv = s.roster.find((a) => a.id === adventurerId);
     if (!adv) return { ok: false, message: '冒险者不存在' };
     if (adv.level >= LEVEL_CAP) return { ok: false, message: '已达 10 级传奇——这个世界没有更强的了' };
+    if (adv.level >= BALANCE.UPGRADE_CAP) {
+      return { ok: false, message: '9、10 级仪式暂未开放（当前上限 8 级，高等级只能靠稀有访客）' };
+    }
     const need = expToNext(adv.level);
     if (adv.exp < need) {
       return { ok: false, message: `历练不足（经验 ${adv.exp}/${need}）` };
     }
-    const cost = LEVEL_UP_COST[adv.level - 1];
-    if (!cost) return { ok: false, message: '升级费用未定义' };
+    const cost = levelUpCost(adv.level + 1, adv.classId);
+    if (!cost) return { ok: false, message: '升级仪式暂未开放' };
     const afford = canAfford(s, { gold: cost.gold, materials: cost.materials });
     if (!afford.ok) return { ok: false, message: afford.message };
 
