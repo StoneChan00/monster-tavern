@@ -1,4 +1,5 @@
 import type { MaterialId } from '../engine/types';
+import { menuConfig } from './balance';
 
 /**
  * 设施槽位 id。训练场/情报网已从酒馆下架（FACILITIES 不再收录），
@@ -10,6 +11,8 @@ export interface UpgradeCost {
   gold: number;
   reputation?: number;
   materials: Partial<Record<MaterialId, number>>;
+  /** 需已解锁的菜谱数（厨房菜单扩容门槛） */
+  unlockedRecipes?: number;
 }
 
 export interface FacilityDef {
@@ -36,20 +39,23 @@ export const LOUNGE: FacilityDef = {
   }),
 };
 
-/** 厨房：每级 生效菜肴 +1 道、烹饪速度 +10% */
+/** 厨房：菜单制（v7）——扩菜单结构（槽位+必需类别）；费用含精英魔核 + 菜谱解锁数门槛 */
 export const KITCHEN: FacilityDef = {
   id: 'kitchen',
   name: '厨房',
   icon: '🍳',
-  describe: (lv) => `同时生效菜肴 ${1 + lv} 道 · 烹饪速度 +${lv * 10}%`,
+  describe: (lv) => {
+    const cfg = menuConfig(lv);
+    const req = cfg.required.length > 0 ? ` · 需覆盖：${cfg.required.length} 类` : ' · 无结构要求';
+    return `菜单 ${cfg.slots} 道${req}`;
+  },
   maxLevel: 4,
-  cost: (lv) => ({
-    gold: [60, 150, 400, 1000][lv],
-    materials: {
-      mat_carapace: [5, 10, 18, 28][lv],
-      mat_rock_salt: [2, 4, 8, 14][lv],
-    },
-  }),
+  cost: (lv) => [
+    { gold: 80, materials: { mat_elite_core_1: 2 }, unlockedRecipes: 4 },
+    { gold: 200, materials: { mat_elite_core_2: 3 }, unlockedRecipes: 7 },
+    { gold: 500, materials: { mat_elite_core_3: 4 }, unlockedRecipes: 10 },
+    { gold: 1200, materials: { mat_elite_core_4: 5 }, unlockedRecipes: 14 },
+  ][lv],
 };
 
 /** 宿舍：每级 团灭休整 -10%（下限减半）；3 级起日薪不足不再掉忠诚 */

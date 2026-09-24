@@ -1,8 +1,8 @@
-import { BALANCE, kitchenBuffSlots, kitchenSpeedMult, wageOfLevel } from '../data/balance';
+import { BALANCE, wageOfLevel } from '../data/balance';
 import { RECIPES } from '../data/recipes';
 import { CLASSES } from '../data/classes';
 import { resolveRound, spawnWave } from './combat';
-import { getAdventurerStats } from './stats';
+import { getAdventurerStats, activeMenuRecipes } from './stats';
 import { pushEvent, pushLog } from './log';
 import { generateVisitors } from './recruitment';
 import { getPartyMembers } from './party';
@@ -22,7 +22,7 @@ function tickOnce(state: GameState, opts: TickOptions): void {
   const rng = opts.rng ?? Math.random;
   const mult = opts.offline ? BALANCE.OFFLINE_EFFICIENCY : 1;
 
-  // 模拟时钟推进（招募到访 / 日薪结算都基于它）
+  // 模拟时钟推进（招募到访 / 日薪 / 菜单供给都基于它）
   state.meta.now += 1000;
 
   // ── 地牢（地图制无限循环） ───────────
@@ -58,29 +58,10 @@ function tickOnce(state: GameState, opts: TickOptions): void {
     }
   }
 
-  // ── 厨房（烹饪速度受厨房等级加成） ──
-  const job = state.kitchen.job;
-  if (job) {
-    job.remainingS -= kitchenSpeedMult(state.tavern.kitchen);
-    if (job.remainingS <= 0) completeCooking(state);
-  }
-
-  // ── Buff 过期 ────────────────────────
-  if (state.kitchen.buffs.length > 0) {
-    for (const b of state.kitchen.buffs) b.remainingS -= 1;
-    const expired = state.kitchen.buffs.filter((b) => b.remainingS <= 0);
-    if (expired.length > 0) {
-      state.kitchen.buffs = state.kitchen.buffs.filter((b) => b.remainingS > 0);
-      for (const e of expired) {
-        const r = RECIPES[e.recipeId];
-        pushLog(state, 'kitchen', `${r?.icon ?? '🍽️'} 「${r?.name ?? '菜肴'}」的效果消散了`);
-      }
-      // HP buff 过期后当前生命可能超上限，钳制
-      for (const m of getPartyMembers(state)) {
-        const maxHp = getAdventurerStats(state, m.adv).hp;
-        if (m.adv.hp > maxHp) m.adv.hp = maxHp;
-      }
-    }
+  // ── 厨房菜单：每小时消耗材料维持供给（缺料槽位暂停） ──
+  if (state.meta.now >= state.kitchen.nextMenuCycleAt) {
+    runMenuCycle(state);
+    state.kitchen.nextMenuCycleAt = state.meta.now + BALANCE.MENU_CYCLE_MS;
   }
 
   // ── 招募到访（模拟时钟驱动，离线同样推进） ──
@@ -100,43 +81,49 @@ function tickOnce(state: GameState, opts: TickOptions): void {
   checkRecipeUnlocks(state);
 }
 
-function completeCooking(state: GameState): void {
-  const job = state.kitchen.job;
-  if (!job) return;
-  const recipe = RECIPES[job.recipeId];
-  if (!recipe) {
-    state.kitchen.job = null;
-    return;
-  }
-  state.kitchen.job = null;
-  state.meta.dishesCooked += 1;
-  // 同菜谱效果刷新（不叠加）
-  state.kitchen.buffs = state.kitchen.buffs.filter((b) => b.recipeId !== recipe.id);
-  // 超出同时生效上限 → 淘汰最早的
-  while (state.kitchen.buffs.length >= kitchenBuffSlots(state.tavern.kitchen)) {
-    const removed = state.kitchen.buffs.shift();
-    if (removed) {
-      const r = RECIPES[removed.recipeId];
-      pushLog(state, 'kitchen', `🍽️ 「${r?.name ?? '菜肴'}」的效果被替换下架`);
+/**
+ * 菜单供给周期：逐槽尝试支付该菜的材料（不含金币）。
+ * 足料 → menuFed=true（效果生效 + 出餐计数 + 忠诚回复）；缺料 → 该槽暂停。
+ */
+export function runMenuCycle(state: GameState): void {
+  const fedCount = state.kitchen.menu.reduce((acc, id) => acc + (id ? 1 : 0), 0);
+  if (fedCount === 0) return;
+  let okCount = 0;
+  for (let i = 0; i < state.kitchen.menu.length; i++) {
+    const id = state.kitchen.menu[i];
+    if (!id) continue;
+    const r = RECIPES[id];
+    if (!r) continue;
+    const afford = Object.entries(r.cost.materials).every(
+      ([mid, need]) => (state.inventory[mid] ?? 0) >= (need ?? 0),
+    );
+    state.kitchen.menuFed[i] = afford;
+    if (afford) {
+      for (const [mid, need] of Object.entries(r.cost.materials)) {
+        state.inventory[mid] = (state.inventory[mid] ?? 0) - (need ?? 0);
+      }
+      okCount += 1;
     }
   }
-  state.kitchen.buffs.push({
-    recipeId: recipe.id,
-    label: recipe.buff.label,
-    stat: recipe.buff.stat,
-    mult: recipe.buff.mult,
-    remainingS: recipe.buff.durationS,
-    totalS: recipe.buff.durationS,
-  });
-  // 开饭：全酒馆冒险者用餐（忠诚度提升）
-  for (const a of state.roster) {
-    a.loyalty = Math.min(100, a.loyalty + recipe.mealLoyalty);
+  if (okCount > 0) {
+    state.meta.dishesCooked += okCount;
+    // 供给成功 → 全员用餐忠诚回复
+    for (const a of state.roster) {
+      a.loyalty = Math.min(100, a.loyalty + BALANCE.MENU_LOYALTY_PER_CYCLE);
+    }
+    const okNames = state.kitchen.menu
+      .filter((id, i) => id && state.kitchen.menuFed[i])
+      .map((id) => `${RECIPES[id!]?.icon ?? '🍽️'}${RECIPES[id!]?.name ?? ''}`)
+      .join('、');
+    const failed = fedCount - okCount;
+    pushLog(
+      state,
+      'kitchen',
+      `🍽️ 菜单供给：${okNames}${failed > 0 ? `（${failed} 道缺料暂停）` : ''}`,
+    );
+  } else {
+    pushLog(state, 'kitchen', '⚠️ 菜单食材告罄——所有菜品暂停供给，去地牢囤点材料吧！');
   }
-  pushLog(
-    state,
-    'kitchen',
-    `${recipe.icon} 「${recipe.name}」出锅！众人（${state.roster.length} 人）大快朵颐（${recipe.buff.label}，持续 ${Math.round(recipe.buff.durationS / 60)} 分钟）`,
-  );
 }
 
 function settleWagesIfDue(state: GameState): void {
@@ -158,8 +145,8 @@ function settleWagesIfDue(state: GameState): void {
     pushLog(state, 'system', `⚠️ 金币不足以支付日薪（需 ${total}），全队忠诚度下降`);
   }
 
-  // 当日无生效菜肴 → 忠诚度缓慢流失（伙食差留不住人）
-  if (state.kitchen.buffs.length === 0) {
+  // 当日无供给菜肴 → 忠诚度缓慢流失（伙食差留不住人）
+  if (activeMenuRecipes(state).length === 0) {
     for (const a of state.roster) {
       a.loyalty = Math.max(0, a.loyalty - BALANCE.LOYALTY_DECAY_NO_BUFF);
     }

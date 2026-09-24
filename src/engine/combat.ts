@@ -1,4 +1,4 @@
-import { BALANCE, dormRestMult } from '../data/balance';
+import { BALANCE, ELITE_CORE_OF, dormRestMult, SIGIL_OF } from '../data/balance';
 import {
   CLASSES,
   MAGE_AOE_RATIO,
@@ -26,21 +26,51 @@ const TARGET_ORDER = [0, 3, 1, 4, 2];
 /**
  * 生成下一波（地图制无限循环）：
  * 95% → 普通波：从本图魔物池随机抽 2~4 只；
- * 5%  → BOSS 波：从 BOSS 池随机抽 1 只 + 1~2 只护卫。
+ * 5%  → 精英波：从精英池随机抽 1 只（借用魔物体型 × 精英倍率）+ 1~2 只护卫。
+ * rng 消耗顺序：isElite → elitePick → guards → guardPick×N（测试注入用）。
  */
 export function spawnWave(state: GameState, rng: () => number = Math.random): void {
   const map = MAPS[state.dungeon.mapId];
-  const isBoss = rng() < BALANCE.BOSS_CHANCE;
+  const isElite = rng() < BALANCE.ELITE_CHANCE;
   const pickFrom = (pool: string[]): string => pool[Math.floor(rng() * pool.length)];
-  let mids: string[];
-  if (isBoss) {
-    const guards = BALANCE.BOSS_GUARD_MIN + Math.floor(rng() * (BALANCE.BOSS_GUARD_MAX - BALANCE.BOSS_GUARD_MIN + 1));
-    mids = [pickFrom(map.bossPool)];
-    for (let i = 0; i < guards; i++) mids.push(pickFrom(map.monsterPool));
-  } else {
-    const count = BALANCE.WAVE_SIZE_MIN + Math.floor(rng() * (BALANCE.WAVE_SIZE_MAX - BALANCE.WAVE_SIZE_MIN + 1));
-    mids = Array.from({ length: count }, () => pickFrom(map.monsterPool));
+  if (isElite) {
+    const eliteDef = map.elitePool[Math.floor(rng() * map.elitePool.length)];
+    const guards = BALANCE.ELITE_GUARD_MIN + Math.floor(rng() * (BALANCE.ELITE_GUARD_MAX - BALANCE.ELITE_GUARD_MIN + 1));
+    const base = MONSTERS[eliteDef.base];
+    state.dungeon.monsters = [
+      {
+        uid: state.meta.nextUid++,
+        monsterId: eliteDef.base,
+        hp: Math.round(base.base.hp * BALANCE.ELITE_HP_MULT),
+        maxHp: Math.round(base.base.hp * BALANCE.ELITE_HP_MULT),
+        elite: { name: eliteDef.name, sigil: eliteDef.sigil },
+      },
+      ...Array.from({ length: guards }, () => {
+        const mid = pickFrom(map.monsterPool);
+        const def = MONSTERS[mid];
+        return { uid: state.meta.nextUid++, monsterId: mid, hp: def.base.hp, maxHp: def.base.hp };
+      }),
+    ];
+    pushEvent(state, {
+      kind: 'waveStart',
+      wave: state.dungeon.waveCount + 1,
+      isElite: true,
+      monsters: state.dungeon.monsters.map((m) => ({
+        uid: m.uid,
+        monsterId: m.monsterId,
+        elite: m.elite !== undefined,
+      })),
+    });
+    state.dungeon.status = 'combat';
+    pushLog(
+      state,
+      'combat',
+      `${map.icon} ${map.name} · 第 ${state.dungeon.waveCount + 1} 波遭遇精英「${eliteDef.name}」与 ${guards} 只护卫！`,
+    );
+    return;
   }
+  const count = BALANCE.WAVE_SIZE_MIN + Math.floor(rng() * (BALANCE.WAVE_SIZE_MAX - BALANCE.WAVE_SIZE_MIN + 1));
+  const mids = Array.from({ length: count }, () => pickFrom(map.monsterPool));
   state.dungeon.monsters = mids.map((mid) => {
     const def = MONSTERS[mid];
     return { uid: state.meta.nextUid++, monsterId: mid, hp: def.base.hp, maxHp: def.base.hp };
@@ -49,13 +79,17 @@ export function spawnWave(state: GameState, rng: () => number = Math.random): vo
   pushEvent(state, {
     kind: 'waveStart',
     wave: state.dungeon.waveCount + 1,
-    isBoss,
-    monsters: state.dungeon.monsters.map((m) => ({ uid: m.uid, monsterId: m.monsterId })),
+    isElite: false,
+    monsters: state.dungeon.monsters.map((m) => ({
+      uid: m.uid,
+      monsterId: m.monsterId,
+      elite: false,
+    })),
   });
   pushLog(
     state,
     'combat',
-    `${map.icon} ${map.name} · 第 ${state.dungeon.waveCount + 1} 波遭遇 ${mids.length} 只魔物${isBoss ? '（BOSS 气?!）' : ''}`,
+    `${map.icon} ${map.name} · 第 ${state.dungeon.waveCount + 1} 波遭遇 ${mids.length} 只魔物`,
   );
 }
 
@@ -74,6 +108,20 @@ function rollDamage(
   };
 }
 
+/** 精英怪的有效数值：借用魔物基础值 × 精英倍率（hp 已在生成时放大） */
+function effectiveStats(m: MonsterInstance) {
+  const def = MONSTERS[m.monsterId];
+  if (!m.elite) return { ...def.base, exp: def.exp, gold: def.gold };
+  return {
+    hp: m.maxHp,
+    atk: Math.round(def.base.atk * BALANCE.ELITE_ATK_MULT),
+    def: Math.round(def.base.def * BALANCE.ELITE_DEF_MULT),
+    spd: def.base.spd + BALANCE.ELITE_SPD_BONUS,
+    exp: Math.round(def.exp * BALANCE.ELITE_EXP_MULT),
+    gold: Math.round(def.gold * BALANCE.ELITE_GOLD_MULT),
+  };
+}
+
 function gainExp(state: GameState, advId: string, baseExp: number, mult: number, rng: () => number): void {
   const adv = state.roster.find((a) => a.id === advId);
   if (!adv) return;
@@ -87,14 +135,15 @@ function gainExp(state: GameState, advId: string, baseExp: number, mult: number,
 
 function onMonsterKilled(state: GameState, target: MonsterInstance, offlineMult: number, rng: () => number): void {
   const def = MONSTERS[target.monsterId];
+  const stats = effectiveStats(target);
   pushEvent(state, { kind: 'death', side: 'monster', targetUid: target.uid, targetMonsterId: target.monsterId });
-  // 图鉴：该种魔物累计击杀 +1（键存在 = 已发现）
+  // 图鉴：该种魔物累计击杀 +1（键存在 = 已发现；精英计入借用魔物）
   state.meta.monsterKills[target.monsterId] = (state.meta.monsterKills[target.monsterId] ?? 0) + 1;
   const expMult = offlineMult * getPartyExpMult(state);
   for (const m of getPartyMembers(state)) {
-    gainExp(state, m.adv.id, def.exp, expMult, rng);
+    gainExp(state, m.adv.id, stats.exp, expMult, rng);
   }
-  const gold = scaledGain(def.gold, offlineMult, rng);
+  const gold = scaledGain(stats.gold, offlineMult, rng);
   state.player.gold += gold;
   state.meta.lifetimeGoldEarned += gold;
   const drops = rollDropsWithBonus(def, offlineMult, getPartyDropMult(state), rng);
@@ -104,7 +153,23 @@ function onMonsterKilled(state: GameState, target: MonsterInstance, offlineMult:
     state.inventory[d.materialId] = (state.inventory[d.materialId] ?? 0) + d.count;
     parts.push(`${MATERIALS[d.materialId]?.name ?? d.materialId} +${d.count}`);
   }
-  pushLog(state, 'loot', `💀 击杀 ${def.name}${parts.length ? `（${parts.join('，')}）` : ''}`);
+  // 精英掉落：职业徽记 ×1 + 本图魔核 ×1（升级仪式硬通货）
+  if (target.elite) {
+    const map = MAPS[state.dungeon.mapId];
+    const sigil = SIGIL_OF[target.elite.sigil];
+    const core = ELITE_CORE_OF[map.number];
+    state.inventory[sigil] = (state.inventory[sigil] ?? 0) + 1;
+    if (core) {
+      state.inventory[core] = (state.inventory[core] ?? 0) + 1;
+      parts.push(`${MATERIALS[sigil]?.icon ?? '🎖️'}${MATERIALS[sigil]?.name ?? sigil} +1`);
+      parts.push(`${MATERIALS[core]?.icon ?? '🟣'}${MATERIALS[core]?.name ?? core} +1`);
+    }
+  }
+  pushLog(
+    state,
+    'loot',
+    `💀 击杀 ${target.elite ? `精英「${target.elite.name}」` : def.name}${parts.length ? `（${parts.join('，')}）` : ''}`,
+  );
 }
 
 function firstAliveMonster(state: GameState): MonsterInstance | undefined {
@@ -131,7 +196,7 @@ function attackMonster(
   critMult: number,
 ): void {
   const def = MONSTERS[target.monsterId];
-  const { dmg, crit } = rollDamage(atk, def.base.def, rng, critChance, critMult);
+  const { dmg, crit } = rollDamage(atk, effectiveStats(target).def, rng, critChance, critMult);
   target.hp -= dmg;
   pushEvent(state, {
     kind: 'hit',
@@ -181,7 +246,7 @@ function memberAct(state: GameState, member: PartyMember, rng: () => number, off
         if (t.hp <= 0) continue;
         const def = MONSTERS[t.monsterId];
         const variance = 1 + (rng() * 2 - 1) * BALANCE.DMG_VARIANCE;
-        const dmg = Math.max(1, Math.round(stats.atk * MAGE_AOE_RATIO * variance) - def.base.def);
+        const dmg = Math.max(1, Math.round(stats.atk * MAGE_AOE_RATIO * variance) - effectiveStats(t).def);
         t.hp -= dmg;
         pushEvent(state, {
           kind: 'hit',
@@ -239,8 +304,8 @@ function memberAct(state: GameState, member: PartyMember, rng: () => number, off
 
 function onWaveCleared(state: GameState): void {
   const map = MAPS[state.dungeon.mapId];
-  // BOSS 波判定：波内首位魔物是否出自 BOSS 池（spawnWave 保证 BOSS 恒在首位）
-  const isBossWave = map.bossPool.includes(state.dungeon.monsters[0]?.monsterId ?? '');
+  // 精英波判定：波内首位魔物带精英标记（spawnWave 保证精英恒在首位）
+  const isEliteWave = state.dungeon.monsters[0]?.elite !== undefined;
   state.meta.totalWavesCleared += 1;
   state.dungeon.waveCount += 1;
 
@@ -254,23 +319,24 @@ function onWaveCleared(state: GameState): void {
     }
   }
 
-  if (isBossWave) {
+  if (isEliteWave) {
+    // totalBossKills 字段名保留（存档兼容），语义 = 累计精英击杀
     state.meta.totalBossKills += 1;
-    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isBoss: true });
+    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isElite: true });
+    const elite = state.dungeon.monsters[0].elite!;
     if (!state.meta.mapsFirstCleared.includes(map.number)) {
       state.meta.mapsFirstCleared.push(map.number);
       state.player.reputation += map.firstClearReputation;
-      const bossName = MONSTERS[state.dungeon.monsters[0]?.monsterId]?.name ?? 'BOSS';
-      pushLog(state, 'system', `🏆 首次肃清 ${map.name} 的 ${bossName}！酒馆声望 +${map.firstClearReputation}`);
+      pushLog(state, 'system', `🏆 首次讨伐 ${map.name} 的精英「${elite.name}」！酒馆声望 +${map.firstClearReputation}`);
     }
-    // 首杀本图 BOSS → 解锁下一张地图
+    // 首次讨伐本图精英 → 解锁下一张地图
     if (map.number === state.dungeon.unlockedMaps && map.number < MAP_DEFS.length) {
       state.dungeon.unlockedMaps = map.number + 1;
       pushLog(state, 'system', `🗺️ 地牢情报更新：解锁 ${MAP_DEFS[map.number].name}！`);
     }
-    pushLog(state, 'combat', `👑 BOSS 肃清！队伍在本图继续驻farm循环`);
+    pushLog(state, 'combat', `👑 精英「${elite.name}」讨伐成功！徽记与魔核入手，队伍继续驻farm循环`);
   } else {
-    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isBoss: false });
+    pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isElite: false });
     pushLog(state, 'combat', `✅ 第 ${state.dungeon.waveCount} 波肃清，短暂休整…`);
   }
   state.dungeon.status = 'waveRest';
@@ -345,7 +411,7 @@ export function resolveRound(state: GameState, rng: () => number, offlineMult: n
     })),
     ...state.dungeon.monsters
       .filter((x) => x.hp > 0)
-      .map((x) => ({ spd: MONSTERS[x.monsterId].base.spd, tie: x.uid, kind: 'monster' as const, monster: x })),
+      .map((x) => ({ spd: effectiveStats(x).spd, tie: x.uid, kind: 'monster' as const, monster: x })),
   ].sort((a, b) => b.spd - a.spd || a.tie - b.tie);
 
   for (const act of actions) {
@@ -372,7 +438,7 @@ export function resolveRound(state: GameState, rng: () => number, offlineMult: n
       if (!target) break;
       const def = MONSTERS[mo.monsterId];
       const targetStats = getAdventurerStats(state, target.adv);
-      const { dmg } = rollDamage(def.base.atk, targetStats.def, rng, 0, 1);
+      const { dmg } = rollDamage(effectiveStats(mo).atk, targetStats.def, rng, 0, 1);
       target.adv.hp -= dmg;
       pushEvent(state, {
         kind: 'hit',

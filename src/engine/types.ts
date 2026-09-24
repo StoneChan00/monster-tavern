@@ -9,7 +9,7 @@
  *   保证离线快进与在线经历完全一致的时间事件。
  */
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export type ClassId = string;
 export type RaceId = string;
@@ -64,23 +64,24 @@ export interface MonsterInstance {
   monsterId: MonsterId;
   hp: number;
   maxHp: number;
+  /** 精英标记：借用 base 魔物体型，掉落职业徽记 + 本图魔核 */
+  elite?: {
+    name: string;
+    sigil: ClassId;
+  };
 }
 
 export type DungeonStatus = 'combat' | 'waveRest' | 'resting';
 
-export interface CookingJob {
-  recipeId: RecipeId;
-  remainingS: number;
-  totalS: number;
-}
-
-export interface ActiveBuff {
-  recipeId: RecipeId;
-  label: string;
-  stat: BuffStat;
-  mult: number; // 乘数，1.25 = +25%
-  remainingS: number;
-  totalS: number;
+/** 厨房菜单（v7 设置制）：菜品每小时消耗材料维持供给 */
+export interface KitchenState {
+  /** 菜单菜品（长度 ≤ 当前厨房等级槽位；空位用 null） */
+  menu: (RecipeId | null)[];
+  /** 各槽位最近一次小时供给是否足料（false = 暂停供料） */
+  menuFed: boolean[];
+  /** 下一次菜单供给的模拟时间（Unix ms） */
+  nextMenuCycleAt: number;
+  unlockedRecipes: RecipeId[];
 }
 
 export type LogKind = 'combat' | 'loot' | 'level' | 'kitchen' | 'tavern' | 'system';
@@ -122,10 +123,10 @@ export type EngineEvent =
   | {
       kind: 'waveStart';
       wave: number; // 本图第 N 波（1-based，循环制无总波数）
-      isBoss: boolean;
-      monsters: Array<{ uid: number; monsterId: MonsterId }>;
+      isElite: boolean;
+      monsters: Array<{ uid: number; monsterId: MonsterId; elite: boolean }>;
     }
-  | { kind: 'waveClear'; wave: number; isBoss: boolean }
+  | { kind: 'waveClear'; wave: number; isElite: boolean }
   | { kind: 'wipe' }
   | { kind: 'revive' }
   | { kind: 'levelup'; targetId: string; level: number };
@@ -170,11 +171,7 @@ export interface GameState {
     lastWageDay: number;
   };
   inventory: Record<string, number>;
-  kitchen: {
-    job: CookingJob | null;
-    unlockedRecipes: RecipeId[];
-    buffs: ActiveBuff[];
-  };
+  kitchen: KitchenState;
   tavern: {
     trainingGround: number; // 训练场 0~5：等级上限/全属性
     lounge: number; // 招待区 0~5：替补席上限/到访批次

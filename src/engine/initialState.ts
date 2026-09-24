@@ -44,9 +44,11 @@ export function createInitialState(now: number = Date.now()): GameState {
     },
     inventory: {},
     kitchen: {
-      job: null,
+      // 固定 7 槽（最大厨房等级）；当前可用槽位由 menuConfig(tavern.kitchen).slots 决定
+      menu: Array<null>(7).fill(null),
+      menuFed: Array<boolean>(7).fill(false),
+      nextMenuCycleAt: now + BALANCE.MENU_CYCLE_MS,
       unlockedRecipes: initialUnlockedRecipes(),
-      buffs: [],
     },
     tavern: { trainingGround: 0, lounge: 0, kitchen: 0, dorm: 0, intel: 0 },
     dungeon: {

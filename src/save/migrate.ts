@@ -186,6 +186,28 @@ function migrateV5toV6(s: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/**
+ * v6（首杀 BOSS 解锁制 + 烹饪 buff 制）→ v7（精英怪体系 + 厨房菜单制）：
+ * - kitchen：job/buffs 移除（烹饪中任务的材料不退补），改为空菜单 + 下一供给周期
+ * - mapsFirstCleared 语义变为"首次讨伐本图精英"（旧档已通关地图直接继承）
+ * - totalBossKills 语义变为"累计精英击杀"（历史计数保留）
+ * - 存量魔物实例补 elite 字段缺失（undefined 即普通）
+ */
+function migrateV6toV7(s: Record<string, unknown>): Record<string, unknown> {
+  const kitchen = (s.kitchen ?? {}) as Record<string, unknown>;
+  const now = (s.meta as Record<string, unknown> | undefined)?.now as number | undefined ?? Date.now();
+  return {
+    ...s,
+    version: 7,
+    kitchen: {
+      menu: Array<null>(7).fill(null),
+      menuFed: Array<boolean>(7).fill(false),
+      nextMenuCycleAt: now + 3_600_000,
+      unlockedRecipes: (kitchen.unlockedRecipes as string[]) ?? [],
+    },
+  };
+}
+
 /** 版本迁移链：migrations[n] 把 v_n 档案升级到 v_{n+1}。新增版本时在此追加。 */
 const migrations: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
   1: migrateV1toV2,
@@ -193,6 +215,7 @@ const migrations: Record<number, (s: Record<string, unknown>) => Record<string, 
   3: migrateV3toV4,
   4: migrateV4toV5,
   5: migrateV5toV6,
+  6: migrateV6toV7,
 };
 
 export function serialize(state: GameState): string {

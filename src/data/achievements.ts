@@ -63,21 +63,21 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'map_2',
     name: '深入矿道',
-    desc: '首杀秘银矿道（图2）的 BOSS',
+    desc: '首次讨伐秘银矿道（图2）的精英',
     icon: '⛏️',
     check: (s) => clearedMap(s, 2),
   },
   {
     id: 'map_4',
     name: '深入裂隙',
-    desc: '首杀熔岩裂隙（图4）的 BOSS',
+    desc: '首次讨伐熔岩裂隙（图4）的精英',
     icon: '🔥',
     check: (s) => clearedMap(s, 4),
   },
   {
     id: 'map_6',
     name: '终焉征服者',
-    desc: '首杀虚空终焉（图6）的 BOSS',
+    desc: '首次讨伐虚空终焉（图6）的精英',
     icon: '🌌',
     check: (s) => clearedMap(s, 6),
   },
@@ -104,8 +104,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   },
   {
     id: 'boss_slayer',
-    name: '屠魔者',
-    desc: '击败 10 只 BOSS',
+    name: '精英猎手',
+    desc: '讨伐 10 只精英怪',
     icon: '🐉',
     check: (s) => s.meta.totalBossKills >= 10,
   },
@@ -161,15 +161,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
 ];
 
 /**
- * 图鉴展示顺序：按 MAP_DEFS 各图魔物池中的首次出现顺序（常规池 → BOSS 池）；
- * 未出现在任何地图的魔物（数据兜底）追加在末尾。
+ * 图鉴展示顺序：按 MAP_DEFS 各图魔物池中的首次出现顺序；
+ * 精英为借用体型的变体（计入基础魔物图鉴），不单列。
  * CODEX_MONSTER_MAP：每种魔物首次出现的地图编号（图鉴标注用）。
  */
 export const CODEX_MONSTER_ORDER: MonsterId[] = (() => {
   const seen = new Set<MonsterId>();
   const order: MonsterId[] = [];
   for (const map of MAP_DEFS) {
-    for (const mid of [...map.monsterPool, ...map.bossPool]) {
+    for (const mid of map.monsterPool) {
       if (!seen.has(mid)) {
         seen.add(mid);
         order.push(mid);
@@ -188,7 +188,7 @@ export const CODEX_MONSTER_ORDER: MonsterId[] = (() => {
 export const CODEX_MONSTER_MAP: Partial<Record<MonsterId, number>> = (() => {
   const map: Partial<Record<MonsterId, number>> = {};
   for (const m of MAP_DEFS) {
-    for (const mid of [...m.monsterPool, ...m.bossPool]) {
+    for (const mid of m.monsterPool) {
       if (map[mid] === undefined) map[mid] = m.number;
     }
   }

@@ -1,5 +1,6 @@
 /** 全局平衡常数 —— 数值调整只改这里，不碰引擎逻辑 */
-import type { MaterialId } from '../engine/types';
+import type { ClassId, MaterialId } from '../engine/types';
+import type { RecipeCategory } from './recipes';
 
 export const BALANCE = {
   /** 模拟步长（秒）。战斗 1 tick = 1 回合 */
@@ -20,14 +21,21 @@ export const BALANCE = {
   WIPE_SUBSIDY_VISIT_DELAY_MS: 60_000,
   /** 波次间休整秒数 */
   WAVE_REST_S: 3,
-  /** 每波出 BOSS 的概率（纯随机；期望约 20 波一遇） */
-  BOSS_CHANCE: 0.05,
+  /** 每波出精英怪的概率（替代旧 BOSS 概念：多种精英、职业徽记掉落） */
+  ELITE_CHANCE: 0.05,
+  /** 精英数值倍率（叠加在借用魔物之上） */
+  ELITE_HP_MULT: 2.2,
+  ELITE_ATK_MULT: 1.35,
+  ELITE_DEF_MULT: 1.25,
+  ELITE_SPD_BONUS: 2,
+  ELITE_EXP_MULT: 4,
+  ELITE_GOLD_MULT: 3.5,
   /** 普通波魔物数量区间 */
   WAVE_SIZE_MIN: 2,
   WAVE_SIZE_MAX: 4,
-  /** BOSS 波附带的护卫数量区间 */
-  BOSS_GUARD_MIN: 1,
-  BOSS_GUARD_MAX: 2,
+  /** 精英波附带的护卫数量区间 */
+  ELITE_GUARD_MIN: 1,
+  ELITE_GUARD_MAX: 2,
   /** 清波后按最大生命比例回血（存活者） */
   HEAL_ON_WAVE_CLEAR: 0.2,
   /** 清波后阵亡者按最大生命比例复活 */
@@ -36,7 +44,9 @@ export const BALANCE = {
   HEAL_ON_LEVEL_UP: 0.25,
   /** 用餐（菜肴生效）获得的忠诚度 */
   LOYALTY_PER_MEAL: 8,
-  /** 日薪结算时若无生效菜肴：全队忠诚度下降 */
+  /** 每小时菜单供给周期：全员忠诚回复 */
+  MENU_LOYALTY_PER_CYCLE: 3,
+  /** 日薪结算时若无供给菜肴：全队忠诚度下降 */
   LOYALTY_DECAY_NO_BUFF: 2,
   /** 忠诚度满值时的属性加成上限（+15%） */
   LOYALTY_STAT_BONUS: 0.15,
@@ -67,8 +77,15 @@ export const BALANCE = {
   /** 每批基础人数；+ floor(招待区/2) */
   VISIT_BATCH_BASE: 2,
 
+  // ── 厨房菜单（v7：设置制 + 每小时消耗） ──
+  /** 菜单供给周期（毫秒，模拟时钟） */
+  MENU_CYCLE_MS: 3_600_000,
+
   // ── 经济（D&D 等级制） ───────────────
   DAY_MS: 86_400_000,
+
+  /** 玩家可手动升级的上限（9、10 级仪式暂未开放，只能靠稀有访客） */
+  UPGRADE_CAP: 8,
 } as const;
 
 /** 日薪 = 2 × 等级²（Lv1=2，Lv5=50，Lv10=200） */
@@ -99,30 +116,79 @@ export function visitorLevelWeights(reputation: number): number[] {
   return base.map((w, i) => w * (1 + reputation * 0.004 * i));
 }
 
-/**
- * 升级仪式费用（经验攒满后仍需支付：金币 + 材料）。
- * 索引 = 当前等级 - 1（即 [0] = Lv1→2 的费用）。
- */
-export const LEVEL_UP_COST: Array<{ gold: number; materials: Partial<Record<MaterialId, number>> }> = [
-  { gold: 80, materials: { mat_gel: 10 } },
-  { gold: 150, materials: { mat_carapace: 8 } },
-  { gold: 300, materials: { mat_mushroom_cap: 10 } },
-  { gold: 600, materials: { mat_mithril: 3 } },
-  { gold: 1000, materials: { mat_mithril: 6 } },
-  { gold: 1600, materials: { mat_core: 2 } },
-  { gold: 2500, materials: { mat_core: 3, mat_mithril: 8 } },
-  { gold: 4000, materials: { mat_void_essence: 3 } },
-  { gold: 6500, materials: { mat_void_essence: 6, mat_core: 5 } },
-];
+/** 职业徽记材料 id（精英掉落 → 对应职业的升级仪式） */
+export const SIGIL_OF: Record<ClassId, MaterialId> = {
+  warrior: 'mat_sigil_warrior',
+  mage: 'mat_sigil_mage',
+  rogue: 'mat_sigil_rogue',
+  priest: 'mat_sigil_priest',
+  ranger: 'mat_sigil_ranger',
+  bard: 'mat_sigil_bard',
+};
 
-/** 生效中的同属性菜肴 buff 上限 = 1 + 厨房等级（0~4 → 1~5 道） */
-export function kitchenBuffSlots(kitchenLevel: number): number {
-  return 1 + kitchenLevel;
+/** 精英魔核材料 id（图 1-6 → 升到 3-8 级的门槛；图 6 的结晶为 9-10 级预留） */
+export const ELITE_CORE_OF: Record<number, MaterialId> = {
+  1: 'mat_elite_core_1',
+  2: 'mat_elite_core_2',
+  3: 'mat_elite_core_3',
+  4: 'mat_elite_core_4',
+  5: 'mat_elite_core_5',
+  6: 'mat_elite_core_6',
+};
+
+export interface LevelUpCostDef {
+  gold: number;
+  materials: Partial<Record<MaterialId, number>>;
 }
 
-/** 烹饪速度倍率 = 1 + 0.1 × 厨房等级 */
-export function kitchenSpeedMult(kitchenLevel: number): number {
-  return 1 + 0.1 * kitchenLevel;
+/**
+ * D&D 升级仪式费用（经验攒满后仍需支付）：
+ * - 升到 2、3 级：普通魔物掉落（凝胶/甲壳）
+ * - 升到 3~8 级：职业徽记（对应职业精英掉落）+ 对应图的精英魔核（图1→3级 … 图6→8级）
+ * - 9、10 级：暂未开放（返回 null），只能通过稀有访客获得高等级冒险者
+ * 索引 = 目标等级（costOfLevel(2) = Lv1→2 的费用）。
+ */
+export function levelUpCost(targetLevel: number, classId: ClassId): LevelUpCostDef | null {
+  const sigil = SIGIL_OF[classId];
+  switch (targetLevel) {
+    case 2:
+      return { gold: 80, materials: { mat_gel: 10 } };
+    case 3:
+      return { gold: 150, materials: { mat_carapace: 8 } };
+    case 4:
+      return { gold: 300, materials: { [sigil]: 1, mat_elite_core_1: 3 } };
+    case 5:
+      return { gold: 600, materials: { [sigil]: 1, mat_elite_core_2: 4 } };
+    case 6:
+      return { gold: 1000, materials: { [sigil]: 2, mat_elite_core_3: 5 } };
+    case 7:
+      return { gold: 1600, materials: { [sigil]: 2, mat_elite_core_4: 6 } };
+    case 8:
+      return { gold: 2500, materials: { [sigil]: 3, mat_elite_core_5: 7 } };
+    default:
+      return null; // 9、10 级仪式暂未开放
+  }
+}
+
+/** 厨房菜单结构：等级 → 槽位数 + 必需类别（满足结构菜单效果才生效；0 级无要求） */
+export interface MenuConfig {
+  slots: number;
+  required: RecipeCategory[];
+}
+
+export const MENU_CONFIG: Record<number, MenuConfig> = {
+  0: { slots: 2, required: [] },
+  1: { slots: 3, required: ['appetizer', 'main', 'drink'] },
+  2: { slots: 4, required: ['appetizer', 'side', 'main', 'drink'] },
+  3: { slots: 5, required: ['appetizer', 'soup', 'side', 'main', 'drink'] },
+  4: {
+    slots: 7,
+    required: ['appetizer', 'soup', 'side', 'main', 'salad', 'dessert', 'drink'],
+  },
+};
+
+export function menuConfig(kitchenLevel: number): MenuConfig {
+  return MENU_CONFIG[Math.max(0, Math.min(4, kitchenLevel))];
 }
 
 /** 休整时长倍率 = 1 - 0.1 × 宿舍等级（下限 0.5） */

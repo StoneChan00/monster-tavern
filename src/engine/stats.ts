@@ -1,6 +1,7 @@
-import { BALANCE } from '../data/balance';
+import { BALANCE, menuConfig } from '../data/balance';
 import { BARD_AURA, CLASSES } from '../data/classes';
 import { activeBonds } from '../data/bonds';
+import { RECIPES } from '../data/recipes';
 import { RACES } from '../data/races';
 import { getPartyMembers } from './party';
 import { LEVEL_CAP } from './types';
@@ -34,9 +35,34 @@ export function adventurerLevelCap(_trainingGroundLevel: number): number {
   return LEVEL_CAP;
 }
 
-/** 全局菜肴 buff：同属性多道取最强 */
+/**
+ * 菜单生效的菜品（v7 菜单制）：
+ * - 槽位已设菜且该槽最近一次小时供给足料（menuFed）
+ * - 厨房 1 级起菜单需覆盖必需类别（前菜/主菜/饮品…），结构不满足则全部暂停生效
+ */
+export function activeMenuRecipes(state: GameState): string[] {
+  const cfg = menuConfig(state.tavern.kitchen);
+  const dishes: string[] = [];
+  const cats = new Set<string>();
+  for (let i = 0; i < state.kitchen.menu.length && i < cfg.slots; i++) {
+    const id = state.kitchen.menu[i];
+    if (!id || !state.kitchen.menuFed[i]) continue;
+    const r = RECIPES[id];
+    if (!r) continue;
+    dishes.push(id);
+    cats.add(r.category);
+  }
+  if (cfg.required.length > 0 && !cfg.required.every((c) => cats.has(c))) {
+    return []; // 结构不满足 → 菜单整体暂停生效
+  }
+  return dishes;
+}
+
+/** 全局菜肴 buff：生效菜单中同属性多道取最强 */
 function dishBuffMult(state: GameState, stat: BuffStat): number {
-  return state.kitchen.buffs.filter((b) => b.stat === stat).reduce((m, b) => Math.max(m, b.mult), 1);
+  return activeMenuRecipes(state)
+    .map((id) => RECIPES[id])
+    .reduce((m, r) => (r.buff.stat === stat ? Math.max(m, r.buff.mult) : m), 1);
 }
 
 /** 编队存活成员的职业列表（羁绊与光环只看存活者） */

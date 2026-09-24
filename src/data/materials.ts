@@ -155,11 +155,115 @@ export const MAT_CORE: MaterialDef = {
   desc: '魔物力量的结晶。传说菜肴与顶级签约的硬通货。',
 };
 
+// ── 精英魔核（6 档，对应图 1-6；升级仪式 3-8 级的地图门槛） ──
+export const MAT_ELITE_CORE_1: MaterialDef = {
+  id: 'mat_elite_core_1',
+  name: '苔藓古树心',
+  icon: '🟢',
+  kind: 'build',
+  tier: 2,
+  desc: '苔藓洞窟精英体内凝结的翠色核心，散发着原始生命力。',
+};
+export const MAT_ELITE_CORE_2: MaterialDef = {
+  id: 'mat_elite_core_2',
+  name: '秘银星髓',
+  icon: '🔵',
+  kind: 'build',
+  tier: 3,
+  desc: '秘银矿道精英吞噬矿脉后析出的星辉髓块。',
+};
+export const MAT_ELITE_CORE_3: MaterialDef = {
+  id: 'mat_elite_core_3',
+  name: '骸骨圣灰',
+  icon: '🟤',
+  kind: 'build',
+  tier: 4,
+  desc: '骸骨墓穴精英火化后留下的圣灰，沉重得不像骨灰。',
+};
+export const MAT_ELITE_CORE_4: MaterialDef = {
+  id: 'mat_elite_core_4',
+  name: '熔火之核',
+  icon: '🔴',
+  kind: 'build',
+  tier: 5,
+  desc: '熔岩裂隙精英胸腔里取出的不灭火种，握久了会烫伤灵魂。',
+};
+export const MAT_ELITE_CORE_5: MaterialDef = {
+  id: 'mat_elite_core_5',
+  name: '晶簇之心',
+  icon: '🔷',
+  kind: 'build',
+  tier: 6,
+  desc: '水晶回廊精英亿万年凝结的心脏，敲击时整条回廊都会共鸣。',
+};
+export const MAT_ELITE_CORE_6: MaterialDef = {
+  id: 'mat_elite_core_6',
+  name: '虚空结晶',
+  icon: '🟣',
+  kind: 'build',
+  tier: 7,
+  desc: '虚空终焉精英坍缩成的完美结晶。9、10 级仪式暂未开放，先替你收着。',
+};
+
+// ── 职业徽记（6 种，职业对应精英掉落；升级仪式硬通货） ──
+export const MAT_SIGIL_WARRIOR: MaterialDef = {
+  id: 'mat_sigil_warrior',
+  name: '战者徽记',
+  icon: '⚔️',
+  kind: 'build',
+  tier: 3,
+  desc: '战士系精英的荣誉徽记。凑齐它，战士的升级仪式才有分量。',
+};
+export const MAT_SIGIL_MAGE: MaterialDef = {
+  id: 'mat_sigil_mage',
+  name: '奥术徽记',
+  icon: '🔮',
+  kind: 'build',
+  tier: 3,
+  desc: '法师系精英的浮空徽记，表面流转着微型法阵。',
+};
+export const MAT_SIGIL_ROGUE: MaterialDef = {
+  id: 'mat_sigil_rogue',
+  name: '暗影徽记',
+  icon: '🗡️',
+  kind: 'build',
+  tier: 3,
+  desc: '盗贼系精英的徽记，只在光熄灭的一瞬显形。',
+};
+export const MAT_SIGIL_PRIEST: MaterialDef = {
+  id: 'mat_sigil_priest',
+  name: '圣光徽记',
+  icon: '✨',
+  kind: 'build',
+  tier: 3,
+  desc: '牧师系精英的徽记，靠近时能听见遥远的圣歌。',
+};
+export const MAT_SIGIL_RANGER: MaterialDef = {
+  id: 'mat_sigil_ranger',
+  name: '猎手徽记',
+  icon: '🏹',
+  kind: 'build',
+  tier: 3,
+  desc: '游侠系精英的徽记，边缘刻着猎物的足迹。',
+};
+export const MAT_SIGIL_BARD: MaterialDef = {
+  id: 'mat_sigil_bard',
+  name: '诗心徽记',
+  icon: '🎻',
+  kind: 'build',
+  tier: 3,
+  desc: '吟游诗人系精英的徽记，贴在耳边能听见未写完的歌。',
+};
+
 export const MATERIALS: Record<MaterialId, MaterialDef> = Object.fromEntries(
   [
     MAT_GEL, MAT_BAT_WING, MAT_MUSHROOM_CAP, MAT_ROCK_SALT, MAT_CRAB_CLAW, MAT_WOLF_MEAT,
     MAT_LIZARD_TAIL, MAT_JELLY_TENTACLE, MAT_FLOWER_HONEY, MAT_TROLL_STEAK, MAT_WRAITH_ESSENCE,
     MAT_ABYSS_TENTACLE, MAT_CRYSTAL_JELLY, MAT_VOID_ESSENCE,
     MAT_CARAPACE, MAT_MITHRIL, MAT_CORE,
+    MAT_ELITE_CORE_1, MAT_ELITE_CORE_2, MAT_ELITE_CORE_3, MAT_ELITE_CORE_4, MAT_ELITE_CORE_5,
+    MAT_ELITE_CORE_6,
+    MAT_SIGIL_WARRIOR, MAT_SIGIL_MAGE, MAT_SIGIL_ROGUE, MAT_SIGIL_PRIEST, MAT_SIGIL_RANGER,
+    MAT_SIGIL_BARD,
   ].map((m) => [m.id, m]),
 );
