@@ -7,7 +7,8 @@ import {
   ROGUE_CRIT,
 } from '../data/classes';
 import { MATERIALS } from '../data/materials';
-import { MAPS, MAP_DEFS, MONSTERS } from '../data/monsters';
+import { MAPS, MAP_DEFS, MONSTERS, ELITE_SIGIL } from '../data/monsters';
+import { generateVisitors } from './recruitment';
 import { getPartyMembers, type PartyMember } from './party';
 import { rollDropsWithBonus, scaledGain } from './drops';
 import { pushEvent, pushLog } from './log';
@@ -26,7 +27,7 @@ const TARGET_ORDER = [0, 3, 1, 4, 2];
 /**
  * 生成下一波（地图制无限循环）：
  * 95% → 普通波：从本图魔物池随机抽 2~4 只；
- * 5%  → 精英波：从精英池随机抽 1 只（借用魔物体型 × 精英倍率）+ 1~2 只护卫。
+ * 5%  → 精英波：从精英池随机抽 1 只原生 BOSS（自带 BOSS 级数值）+ 1~2 只护卫。
  * rng 消耗顺序：isElite → elitePick → guards → guardPick×N（测试注入用）。
  */
 export function spawnWave(state: GameState, rng: () => number = Math.random): void {
@@ -34,23 +35,25 @@ export function spawnWave(state: GameState, rng: () => number = Math.random): vo
   const isElite = rng() < BALANCE.ELITE_CHANCE;
   const pickFrom = (pool: string[]): string => pool[Math.floor(rng() * pool.length)];
   if (isElite) {
-    const eliteDef = map.elitePool[Math.floor(rng() * map.elitePool.length)];
+    const mid = pickFrom(map.elitePool);
+    const sigil = ELITE_SIGIL[mid];
     const guards = BALANCE.ELITE_GUARD_MIN + Math.floor(rng() * (BALANCE.ELITE_GUARD_MAX - BALANCE.ELITE_GUARD_MIN + 1));
-    const base = MONSTERS[eliteDef.base];
+    const base = MONSTERS[mid];
     state.dungeon.monsters = [
       {
         uid: state.meta.nextUid++,
-        monsterId: eliteDef.base,
-        hp: Math.round(base.base.hp * BALANCE.ELITE_HP_MULT),
-        maxHp: Math.round(base.base.hp * BALANCE.ELITE_HP_MULT),
-        elite: { name: eliteDef.name, sigil: eliteDef.sigil },
+        monsterId: mid,
+        hp: base.base.hp,
+        maxHp: base.base.hp,
+        ...(sigil ? { elite: { sigil } } : {}),
       },
       ...Array.from({ length: guards }, () => {
-        const mid = pickFrom(map.monsterPool);
-        const def = MONSTERS[mid];
-        return { uid: state.meta.nextUid++, monsterId: mid, hp: def.base.hp, maxHp: def.base.hp };
+        const gmid = pickFrom(map.monsterPool);
+        const gdef = MONSTERS[gmid];
+        return { uid: state.meta.nextUid++, monsterId: gmid, hp: gdef.base.hp, maxHp: gdef.base.hp };
       }),
     ];
+    state.dungeon.status = 'combat';
     pushEvent(state, {
       kind: 'waveStart',
       wave: state.dungeon.waveCount + 1,
@@ -61,11 +64,10 @@ export function spawnWave(state: GameState, rng: () => number = Math.random): vo
         elite: m.elite !== undefined,
       })),
     });
-    state.dungeon.status = 'combat';
     pushLog(
       state,
       'combat',
-      `${map.icon} ${map.name} · 第 ${state.dungeon.waveCount + 1} 波遭遇精英「${eliteDef.name}」与 ${guards} 只护卫！`,
+      `${map.icon} ${map.name} · 第 ${state.dungeon.waveCount + 1} 波遭遇精英「${base.name}」与 ${guards} 只护卫！`,
     );
     return;
   }
@@ -108,18 +110,10 @@ function rollDamage(
   };
 }
 
-/** 精英怪的有效数值：借用魔物基础值 × 精英倍率（hp 已在生成时放大） */
+/** 魔物有效数值（精英 = 原生 BOSS，自带 BOSS 级数值，无需放大） */
 function effectiveStats(m: MonsterInstance) {
   const def = MONSTERS[m.monsterId];
-  if (!m.elite) return { ...def.base, exp: def.exp, gold: def.gold };
-  return {
-    hp: m.maxHp,
-    atk: Math.round(def.base.atk * BALANCE.ELITE_ATK_MULT),
-    def: Math.round(def.base.def * BALANCE.ELITE_DEF_MULT),
-    spd: def.base.spd + BALANCE.ELITE_SPD_BONUS,
-    exp: Math.round(def.exp * BALANCE.ELITE_EXP_MULT),
-    gold: Math.round(def.gold * BALANCE.ELITE_GOLD_MULT),
-  };
+  return { ...def.base, exp: def.exp, gold: def.gold };
 }
 
 function gainExp(state: GameState, advId: string, baseExp: number, mult: number, rng: () => number): void {
@@ -168,7 +162,7 @@ function onMonsterKilled(state: GameState, target: MonsterInstance, offlineMult:
   pushLog(
     state,
     'loot',
-    `💀 击杀 ${target.elite ? `精英「${target.elite.name}」` : def.name}${parts.length ? `（${parts.join('，')}）` : ''}`,
+    `💀 击杀 ${target.elite ? `精英「${def.name}」` : def.name}${parts.length ? `（${parts.join('，')}）` : ''}`,
   );
 }
 
@@ -323,18 +317,18 @@ function onWaveCleared(state: GameState): void {
     // totalBossKills 字段名保留（存档兼容），语义 = 累计精英击杀
     state.meta.totalBossKills += 1;
     pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isElite: true });
-    const elite = state.dungeon.monsters[0].elite!;
+    const eliteName = MONSTERS[state.dungeon.monsters[0]?.monsterId]?.name ?? '精英';
     if (!state.meta.mapsFirstCleared.includes(map.number)) {
       state.meta.mapsFirstCleared.push(map.number);
       state.player.reputation += map.firstClearReputation;
-      pushLog(state, 'system', `🏆 首次讨伐 ${map.name} 的精英「${elite.name}」！酒馆声望 +${map.firstClearReputation}`);
+      pushLog(state, 'system', `🏆 首次讨伐 ${map.name} 的精英「${eliteName}」！酒馆声望 +${map.firstClearReputation}`);
     }
     // 首次讨伐本图精英 → 解锁下一张地图
     if (map.number === state.dungeon.unlockedMaps && map.number < MAP_DEFS.length) {
       state.dungeon.unlockedMaps = map.number + 1;
       pushLog(state, 'system', `🗺️ 地牢情报更新：解锁 ${MAP_DEFS[map.number].name}！`);
     }
-    pushLog(state, 'combat', `👑 精英「${elite.name}」讨伐成功！徽记与魔核入手，队伍继续驻farm循环`);
+    pushLog(state, 'combat', `👑 精英「${eliteName}」讨伐成功！徽记与魔核入手，队伍继续驻farm循环`);
   } else {
     pushEvent(state, { kind: 'waveClear', wave: state.dungeon.waveCount, isElite: false });
     pushLog(state, 'combat', `✅ 第 ${state.dungeon.waveCount} 波肃清，短暂休整…`);
@@ -353,8 +347,8 @@ function onWiped(state: GameState): void {
 }
 
 /**
- * 首次团灭应急资助（仅一次）：金币 + 签约材料，并在无客到访时立刻安排一批。
- * 初期单人小队难度偏高——引导玩家把资助花在「招募第一位伙伴」上。
+ * 首次团灭应急资助（仅一次）：金币 + 签约材料；若酒馆无客，**立即**安排一批到访
+ * （引导"去招募"必须当下可完成，不等下一批周期）。
  * 注意：不计入 lifetimeGoldEarned（那是战斗收入统计，资助是理事会拨款）。
  */
 function grantWipeSubsidy(state: GameState): void {
@@ -369,9 +363,12 @@ function grantWipeSubsidy(state: GameState): void {
     matParts.push(`${MATERIALS[mid]?.icon ?? '📦'}${MATERIALS[mid]?.name ?? mid}×${count}`);
   }
   if (state.recruitment.visitors.length === 0) {
-    state.recruitment.nextVisitAt = Math.min(
-      state.recruitment.nextVisitAt,
-      state.meta.now + BALANCE.WIPE_SUBSIDY_VISIT_DELAY_MS,
+    state.recruitment.visitors = generateVisitors(state, Math.random);
+    state.recruitment.nextVisitAt = state.meta.now + BALANCE.VISIT_INTERVAL_S * 1000;
+    pushLog(
+      state,
+      'system',
+      `🍻 听说这里遇上了麻烦，${state.recruitment.visitors.length} 位冒险者立刻赶到了酒馆！`,
     );
   }
   pushLog(

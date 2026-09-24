@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInitialState } from '../src/engine/initialState';
@@ -28,7 +28,7 @@ import {
   visitorLevelWeights,
   wageOfLevel,
 } from '../src/data/balance';
-import { MAP_DEFS, MONSTERS } from '../src/data/monsters';
+import { ELITE_SIGIL, MAP_DEFS, MONSTERS } from '../src/data/monsters';
 import { RECIPES } from '../src/data/recipes';
 import { MATERIALS } from '../src/data/materials';
 import { RACES } from '../src/data/races';
@@ -247,33 +247,35 @@ describe('存档迁移链（v1 → v7）', () => {
 });
 
 describe('地图制随机波次（精英体系）', () => {
-  it('6 张地图结构完整：魔物/精英池已注册、首杀声望递增、职业徽记全覆盖', () => {
+  it('6 张地图结构完整：魔物池已注册、精英=原生 BOSS、职业徽记全局覆盖', () => {
     expect(MAP_DEFS).toHaveLength(6);
     const all = new Set<string>();
     let prevRep = 0;
-    const sigilClasses = new Set<string>();
+    const sigilClasses = new Map<string, number>();
     for (const m of MAP_DEFS) {
       expect(m.monsterPool.length).toBeGreaterThan(0);
-      expect(m.elitePool).toHaveLength(6); // 每图六只职业向精英
+      expect(m.elitePool.length).toBeGreaterThanOrEqual(1); // 每图至少 1 只原生 BOSS 精英
       for (const mid of m.monsterPool) {
         expect(MONSTERS[mid]).toBeDefined();
         all.add(mid);
       }
-      for (const e of m.elitePool) {
-        expect(MONSTERS[e.base]).toBeDefined();
-        all.add(e.base); // 精英借用体型的魔物同样有归属
-        sigilClasses.add(e.sigil);
+      for (const eid of m.elitePool) {
+        expect(MONSTERS[eid]).toBeDefined();
+        all.add(eid);
+        const sigil = ELITE_SIGIL[eid];
+        expect(sigil, `${eid} 应有职业徽记分配`).toBeDefined();
+        sigilClasses.set(sigil!, (sigilClasses.get(sigil!) ?? 0) + 1);
       }
       expect(m.firstClearReputation).toBeGreaterThan(prevRep);
       prevRep = m.firstClearReputation;
     }
-    // 59 种全部有归属（常规池 + 扩充怪）
+    // 59 种全部有归属（常规池 + 精英池）
     expect(all.size).toBe(Object.keys(MONSTERS).length);
-    // 每图的六只精英分别对应六个职业
-    expect(sigilClasses.size).toBe(6);
-    for (const m of MAP_DEFS) {
-      expect(new Set(m.elitePool.map((e) => e.sigil)).size).toBe(6);
+    // 每职业 ≥3 只精英（跨图分布，徽记不区分地图）
+    for (const [cls, n] of sigilClasses) {
+      expect(n, `${cls} 精英数`).toBeGreaterThanOrEqual(3);
     }
+    expect(sigilClasses.size).toBe(6);
   });
 
   it('普通波：2~4 只、全部来自本图池', () => {
@@ -296,16 +298,17 @@ describe('地图制随机波次（精英体系）', () => {
     }
   });
 
-  it('精英波：注入 rng 强制触发，精英居首 + 1~2 护卫 + 数值放大', () => {
+  it('精英波：注入 rng 强制触发，原生 BOSS 居首（自带数值）+ 1~2 护卫', () => {
     const s = freshState();
-    // rng 消耗顺序：isElite(0.01) → elitePick(0→e1_warrior 苔藓兽王) → guards(0.99→2 只) → 护卫×2(0.5)
+    // rng 消耗顺序：isElite(0.01) → elitePick(0→slime_king) → guards(0.99→2 只) → 护卫×2(0.5)
     spawnWave(s, fakeRng([0.01, 0, 0.99, 0.5, 0.5]));
     expect(s.dungeon.monsters.length).toBe(3);
     const elite = s.dungeon.monsters[0];
+    expect(MAP_DEFS[0].elitePool).toContain(elite.monsterId);
     expect(elite.elite).toBeDefined();
-    expect(elite.elite!.sigil).toBe('warrior');
-    const baseDef = MONSTERS[elite.monsterId];
-    expect(elite.maxHp).toBe(Math.round(baseDef.base.hp * BALANCE.ELITE_HP_MULT)); // hp ×2.2
+    expect(elite.elite!.sigil).toBe(ELITE_SIGIL[elite.monsterId]);
+    const def = MONSTERS[elite.monsterId];
+    expect(elite.maxHp).toBe(def.base.hp); // 原生 BOSS 数值，无倍率
     expect(s.events.find((e) => e.kind === 'waveStart')).toMatchObject({
       kind: 'waveStart',
       isElite: true,
@@ -1093,7 +1096,7 @@ describe('首次团灭应急资助（v6）', () => {
     s.dungeon.status = 'combat';
   }
 
-  it('首次团灭：发放金币+签约材料，标记已领，无客时立刻安排到访', () => {
+  it('首次团灭：发放金币+签约材料，标记已领，无客时立即刷新一批到访', () => {
     const t0 = 1_700_000_000_000;
     const s = createInitialState(t0);
     forceWipe(s);
@@ -1103,9 +1106,11 @@ describe('首次团灭应急资助（v6）', () => {
     // 初始 60 金 + 拨款 200（无战斗击杀，精确值）
     expect(s.player.gold).toBe(60 + BALANCE.WIPE_SUBSIDY_GOLD);
     expect(s.inventory['mat_carapace']).toBe(BALANCE.WIPE_SUBSIDY_MATERIALS.mat_carapace);
-    // 无客到访 → 下一批提前到 60 秒内（初始为 t0+180s，被提前到 t0+1s+60s）
-    expect(s.recruitment.nextVisitAt).toBe(t0 + 1000 + BALANCE.WIPE_SUBSIDY_VISIT_DELAY_MS);
+    // 无客到访 → 立即生成一批（引导当下可完成），批次周期重置
+    expect(s.recruitment.visitors.length).toBe(BALANCE.VISIT_BATCH_BASE);
+    expect(s.recruitment.nextVisitAt).toBe(t0 + 1000 + BALANCE.VISIT_INTERVAL_S * 1000);
     expect(s.log.some((l) => l.text.includes('理事会'))).toBe(true);
+    expect(s.log.some((l) => l.text.includes('立刻赶到'))).toBe(true);
   });
 
   it('已有客到访时不提前批次（引导直接可完成）', () => {

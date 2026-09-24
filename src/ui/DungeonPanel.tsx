@@ -166,7 +166,7 @@ export function DungeonPanel() {
                     <div className="min-w-0 flex-1">
                       <div className="flex justify-between">
                         <span className={isElite ? 'font-bold text-[#f0d78c]' : ''}>
-                          {isElite ? `👑 ${m.elite!.name}` : def.name}
+                          {isElite ? `👑 ${def.name}` : def.name}
                         </span>
                         <span className="tabular-nums text-[#a89880]">
                           {Math.max(0, m.hp)}/{m.maxHp}

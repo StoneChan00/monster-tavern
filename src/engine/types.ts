@@ -64,9 +64,8 @@ export interface MonsterInstance {
   monsterId: MonsterId;
   hp: number;
   maxHp: number;
-  /** 精英标记：借用 base 魔物体型，掉落职业徽记 + 本图魔核 */
+  /** 精英标记（原生 BOSS）：掉落对应职业徽记 + 本图魔核 */
   elite?: {
-    name: string;
     sigil: ClassId;
   };
 }

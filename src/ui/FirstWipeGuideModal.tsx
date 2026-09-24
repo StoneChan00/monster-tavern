@@ -38,7 +38,7 @@ export function FirstWipeGuideModal({ onGoRecruit }: { onGoRecruit: () => void }
         </div>
         <p className="mt-3 text-center text-xs leading-relaxed text-[#a89880]">
           {firstMember
-            ? '听说这里遇上了麻烦，一位冒险者正快马赶来——去酒馆的「招待区」签约你的第一位伙伴，组成小队再战吧！'
+            ? '听说这里遇上了麻烦，冒险者们已经赶到酒馆——去招待区签约你的第一位伙伴，组成小队再战吧！'
             : '去酒馆的「招待区」看看，签约新的伙伴壮大队伍吧！'}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-2">

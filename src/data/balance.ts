@@ -13,23 +13,14 @@ export const BALANCE = {
   WELCOME_BACK_THRESHOLD_S: 120,
   /** 团灭后休整时长（宿舍每级 -10%，下限 50%） */
   REST_AFTER_WIPE_S: 120,
-  /** 首次团灭应急资助：金币 + 签约材料（初期难度缓冲，仅一次） */
+  /** 首次团灭应急资助：金币 + 签约材料（初期难度缓冲，仅一次；同时立即刷新一批到访） */
   WIPE_SUBSIDY_GOLD: 200,
   /** 资助附带的签约材料（覆盖 Lv1~2 访客的签约需求） */
   WIPE_SUBSIDY_MATERIALS: { mat_carapace: 4 },
-  /** 资助时若无客到访：最迟多少毫秒内安排一批（保证引导可完成） */
-  WIPE_SUBSIDY_VISIT_DELAY_MS: 60_000,
   /** 波次间休整秒数 */
   WAVE_REST_S: 3,
-  /** 每波出精英怪的概率（替代旧 BOSS 概念：多种精英、职业徽记掉落） */
+  /** 每波出精英怪的概率（原生 BOSS 作为精英：多种精英、职业徽记掉落） */
   ELITE_CHANCE: 0.05,
-  /** 精英数值倍率（叠加在借用魔物之上） */
-  ELITE_HP_MULT: 2.2,
-  ELITE_ATK_MULT: 1.35,
-  ELITE_DEF_MULT: 1.25,
-  ELITE_SPD_BONUS: 2,
-  ELITE_EXP_MULT: 4,
-  ELITE_GOLD_MULT: 3.5,
   /** 普通波魔物数量区间 */
   WAVE_SIZE_MIN: 2,
   WAVE_SIZE_MAX: 4,

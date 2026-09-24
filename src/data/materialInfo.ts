@@ -1,6 +1,6 @@
 import { ELITE_CORE_OF, SIGIL_OF, levelUpCost } from './balance';
 import { CLASSES } from './classes';
-import { MAP_DEFS, MONSTERS } from './monsters';
+import { ELITE_SIGIL, MAP_DEFS, MONSTERS } from './monsters';
 import { RECIPES } from './recipes';
 import type { ClassId, MaterialId } from '../engine/types';
 
@@ -97,12 +97,13 @@ export function materialSourcesOf(materialId: MaterialId): MaterialSource[] {
         out.push({ map: map.number, mapName: map.name, from: m.name, elite: false });
       }
     }
-    for (const e of map.elitePool) {
+    for (const eid of map.elitePool) {
       // 精英固定掉落：本图魔核 + 对应职业徽记
       const isCore = ELITE_CORE_OF[map.number] === materialId;
-      const isSigil = SIGIL_OF[e.sigil] === materialId;
+      const sigil = ELITE_SIGIL[eid];
+      const isSigil = sigil !== undefined && SIGIL_OF[sigil] === materialId;
       if (isCore || isSigil) {
-        out.push({ map: map.number, mapName: map.name, from: `精英·${e.name}`, elite: true });
+        out.push({ map: map.number, mapName: map.name, from: `精英·${MONSTERS[eid].name}`, elite: true });
       }
     }
   }
