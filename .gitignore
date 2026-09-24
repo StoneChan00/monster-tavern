@@ -3,3 +3,6 @@ dist/
 coverage/
 *.local
 .DS_Store
+
+# 素材原始 zip（解压后的内容已入库 assets/packs/）
+assets/packs/*.zip
