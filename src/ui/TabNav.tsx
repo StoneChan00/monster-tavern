@@ -1,6 +1,6 @@
 const TABS = [
   { id: 'dungeon', label: '地牢', icon: '⚔️' },
-  { id: 'party', label: '冒险者', icon: '🧑‍🤝‍🧑' },
+  { id: 'dorm', label: '宿舍', icon: '🛏️' },
   { id: 'kitchen', label: '厨房', icon: '🍳' },
   { id: 'tavern', label: '酒馆', icon: '🍺' },
   { id: 'codex', label: '图鉴', icon: '📖' },

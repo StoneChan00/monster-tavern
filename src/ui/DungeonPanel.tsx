@@ -2,13 +2,16 @@ import { Panel } from './Panel';
 import { Bar } from './Bar';
 import { BattleViewport } from './BattleViewport';
 import { MonsterSprite } from './SpriteIcon';
+import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
+import { BALANCE } from '../data/balance';
 import { CLASSES } from '../data/classes';
+import { RACES } from '../data/races';
 import { MAPS, MAP_DEFS, MONSTERS } from '../data/monsters';
-import { getAdventurerStats } from '../engine/stats';
-import { getPartyMembers } from '../engine/party';
+import { getAdventurerStats, levelTier } from '../engine/stats';
+import { getPartyMembers, isSlotUnlocked } from '../engine/party';
 import { fmtDuration, fmtNum } from '../utils/format';
-import type { LogKind } from '../engine/types';
+import type { GameState, LogKind } from '../engine/types';
 
 const LOG_COLORS: Record<LogKind, string> = {
   combat: 'text-slate-300',
@@ -20,6 +23,13 @@ const LOG_COLORS: Record<LogKind, string> = {
 };
 
 const MAP_LABEL = ['一', '二', '三', '四', '五', '六'];
+
+/** 编队槽位行：前排承伤 / 中排标准 / 后排受保护 */
+const ROWS: Array<{ label: string; icon: string; slots: number[] }> = [
+  { label: '前排', icon: '🛡️', slots: [0, 3] },
+  { label: '中排', icon: '⚔️', slots: [1, 4] },
+  { label: '后排', icon: '🏹', slots: [2] },
+];
 
 /** 地牢面板：选图 / 队伍状态 / 魔物 / 战斗日志（地图制无限循环） */
 export function DungeonPanel() {
@@ -61,6 +71,27 @@ export function DungeonPanel() {
         </div>
       </Panel>
 
+      {/* 编队（前中后排站位） */}
+      <Panel title="编队（前排承伤，中后排输出）" icon="🧑‍🤝‍🧑">
+        <div className="space-y-2">
+          {ROWS.map((row) => (
+            <div key={row.label}>
+              <div className="mb-1 text-[10px] font-bold text-[#a89880]">
+                {row.icon} {row.label}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {row.slots.map((slot) => (
+                  <SlotCard key={slot} slot={slot} />
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="text-center text-[10px] text-[#6b5d48]">
+            冒险者的详细状态（历练/忠诚/升级仪式）在「宿舍」页签
+          </div>
+        </div>
+      </Panel>
+
       {/* 队伍与战斗 */}
       <Panel
         title={
@@ -87,7 +118,7 @@ export function DungeonPanel() {
             <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 lg:grid-cols-5">
               {members.length === 0 ? (
                 <div className="border-2 border-[#3a2d1e] bg-[#1f1812] p-2 text-center text-[#a89880] sm:col-span-3 lg:col-span-5">
-                  无人出征——去「冒险者」页签编队吧！
+                  无人出征——在上方「编队」指派冒险者吧！
                 </div>
               ) : (
                 members.map((m) => {
@@ -194,5 +225,72 @@ function StatusBadge() {
     <span className="border-2 border-[#3a2d1e] bg-[#1f1812] px-2 py-0.5 text-[10px] font-bold text-[#a89880]">
       ⏳ 波次间隔 {d.restRemainingS}s
     </span>
+  );
+}
+
+/** 单个编队槽位卡：成员血条 + 指派下拉 */
+function SlotCard({ slot }: { slot: number }) {
+  const s = useGameStore((st) => st.state);
+  return (
+    <div className="border-2 border-[#3a2d1e] bg-[#1f1812] p-2">
+      <SlotContent slot={slot} state={s} />
+    </div>
+  );
+}
+
+function SlotContent({ slot, state }: { slot: number; state: GameState }) {
+  const s = state;
+  const unlocked = isSlotUnlocked(slot, s.player.reputation);
+  const id = s.party[slot];
+  const adv = id ? s.roster.find((a) => a.id === id) : undefined;
+
+  if (!unlocked) {
+    return (
+      <div className="flex h-full items-center justify-center py-2 text-xs text-[#5b4d3a]">
+        🔒 声望 {BALANCE.SLOT_UNLOCK_REP[slot]} 解锁
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {adv ? (
+        <div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <CharacterSprite classId={adv.classId} size={18} />
+            <span className="truncate font-bold" style={{ color: levelTier(adv.level).color }}>
+              {adv.name}
+            </span>
+            <span className="ml-auto shrink-0 text-[10px] text-[#a89880]">
+              {RACES[adv.race]?.name ?? '人类'} · {CLASSES[adv.classId].name} ·{' '}
+              <span style={{ color: levelTier(adv.level).color }}>Lv{adv.level}</span>
+            </span>
+          </div>
+          <Bar
+            value={Math.min(adv.hp, getAdventurerStats(s, adv).hp)}
+            max={getAdventurerStats(s, adv).hp}
+            color={adv.hp <= 0 ? '#555' : '#7cb342'}
+            height="h-2"
+          />
+        </div>
+      ) : (
+        <div className="py-1 text-center text-xs text-[#5b4d3a]">（空位）</div>
+      )}
+      <select
+        className="pixel-select w-full"
+        value={id ?? ''}
+        onChange={(e) => {
+          void useGameStore.getState().assignToSlot(slot, e.target.value || null);
+        }}
+      >
+        <option value="">（空位）</option>
+        {s.roster.map((a) => (
+          <option key={a.id} value={a.id}>
+            {CLASSES[a.classId].icon} {a.name} · {RACES[a.race]?.name ?? '人类'}
+            {CLASSES[a.classId].name} · Lv{a.level}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

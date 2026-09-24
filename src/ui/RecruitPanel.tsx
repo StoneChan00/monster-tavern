@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Panel } from './Panel';
 import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
@@ -12,9 +12,18 @@ import type { Visitor } from '../engine/types';
 /** 招募面板：到访者列表 + 签约（D&D 等级制，高等级到访极稀有） */
 export function RecruitPanel() {
   const s = useGameStore((st) => st.state);
+  const highlight = useGameStore((st) => st.recruitHighlight);
+  const clearHighlight = useGameStore((st) => st.clearRecruitHighlight);
   const [hints, setHints] = useState<Record<number, string>>({});
   const nextIn = Math.max(0, (s.recruitment.nextVisitAt - s.meta.now) / 1000);
   const visitors = s.recruitment.visitors;
+
+  // 引导高亮 4 秒后自动熄灭（面板边框金色脉冲）
+  useEffect(() => {
+    if (!highlight) return;
+    const t = setTimeout(() => clearHighlight(), 4000);
+    return () => clearTimeout(t);
+  }, [highlight, clearHighlight]);
 
   const onSign = (uid: number) => {
     const r = useGameStore.getState().signVisitor(uid);
@@ -23,9 +32,16 @@ export function RecruitPanel() {
 
   return (
     <Panel
-      title={visitors.length > 0 ? `招募 · ${visitors.length} 位冒险者正在用餐` : `招募 · 下一批 ${fmtDuration(nextIn)} 后到访`}
-      icon="🍻"
+      title={visitors.length > 0 ? `招待区 · ${visitors.length} 位冒险者正在用餐` : `招待区 · 下一批 ${fmtDuration(nextIn)} 后到访`}
+      icon="🪑"
+      className={highlight ? 'guide-flash' : ''}
+      id="lounge-visitors"
     >
+      {highlight ? (
+        <div className="mb-2 border-2 border-[#8a6a2a] bg-[#2b2118] p-2 text-[11px] leading-relaxed text-[#f0d78c]">
+          💡 用理事会的拨款签约一位伙伴——编队越满，地牢越稳！
+        </div>
+      ) : null}
       {visitors.length === 0 ? (
         <p className="text-xs text-[#a89880]">
           暂无冒险者到访。解锁更多菜谱能吸引特定职业；高等级冒险者（Lv9-10
