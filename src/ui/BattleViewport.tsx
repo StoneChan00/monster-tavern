@@ -68,7 +68,11 @@ export function BattleViewport() {
     let lastEventId = 0;
     let banner: Text | null = null;
 
-    const stageWidth = (): number => app.renderer.width / app.renderer.resolution;
+    /**
+     * 视口逻辑宽度（CSS 像素）。必须读宿主元素——Pixi v8 的 renderer.width
+     * 已是 CSS 像素，再除 resolution 会在 DPR>1 时把地板铺不满（右侧黑块）。
+     */
+    const stageWidth = (): number => Math.max(240, host.clientWidth);
 
     const addTween = (dur: number, tick: (k: number) => void, end?: () => void, delay = 0): void => {
       tweens.push({ t: -delay, dur, tick, end });
