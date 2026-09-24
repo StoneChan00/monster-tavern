@@ -92,7 +92,7 @@ export function CodexPanel() {
                 {discoveredThis ? (
                   sprite ? (
                     <img
-                      src={`/sprites/monsters/${sprite}`}
+                      src={`${import.meta.env.BASE_URL}sprites/monsters/${sprite}`}
                       alt={def.name}
                       width={36}
                       height={36}
@@ -104,7 +104,7 @@ export function CodexPanel() {
                   )
                 ) : sprite ? (
                   <img
-                    src={`/sprites/monsters/${sprite}`}
+                    src={`${import.meta.env.BASE_URL}sprites/monsters/${sprite}`}
                     alt=""
                     width={36}
                     height={36}
