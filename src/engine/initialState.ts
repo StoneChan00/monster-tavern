@@ -23,6 +23,7 @@ export function createInitialState(now: number = Date.now()): GameState {
       mapsFirstCleared: [],
       monsterKills: {},
       dishesCooked: 0,
+      wipeSubsidyClaimed: false,
     },
     player: { gold: 60, reputation: 0 },
     roster: [

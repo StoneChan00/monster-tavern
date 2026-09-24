@@ -169,12 +169,30 @@ function migrateV4toV5(s: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/**
+ * v5（6 地图制 + D&D 等级制）→ v6（首次团灭应急资助）：
+ * meta 补 wipeSubsidyClaimed。旧档未记录团灭史，按「未领取」处理——
+ * 下次团灭时获得一次性小额拨款（对老玩家只是杯水车薪的馈赠，无害）。
+ */
+function migrateV5toV6(s: Record<string, unknown>): Record<string, unknown> {
+  const meta = (s.meta ?? {}) as Record<string, unknown>;
+  return {
+    ...s,
+    version: 6,
+    meta: {
+      ...meta,
+      wipeSubsidyClaimed: (meta.wipeSubsidyClaimed as boolean) ?? false,
+    },
+  };
+}
+
 /** 版本迁移链：migrations[n] 把 v_n 档案升级到 v_{n+1}。新增版本时在此追加。 */
 const migrations: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
   1: migrateV1toV2,
   2: migrateV2toV3,
   3: migrateV3toV4,
   4: migrateV4toV5,
+  5: migrateV5toV6,
 };
 
 export function serialize(state: GameState): string {

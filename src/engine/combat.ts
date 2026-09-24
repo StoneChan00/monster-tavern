@@ -283,6 +283,36 @@ function onWiped(state: GameState): void {
   state.dungeon.restRemainingS = restS;
   pushEvent(state, { kind: 'wipe' });
   pushLog(state, 'combat', `💔 队伍全灭……全员被抬回酒馆休整（约 ${restS} 秒后重返）`);
+  grantWipeSubsidy(state);
+}
+
+/**
+ * 首次团灭应急资助（仅一次）：金币 + 签约材料，并在无客到访时立刻安排一批。
+ * 初期单人小队难度偏高——引导玩家把资助花在「招募第一位伙伴」上。
+ * 注意：不计入 lifetimeGoldEarned（那是战斗收入统计，资助是理事会拨款）。
+ */
+function grantWipeSubsidy(state: GameState): void {
+  if (state.meta.wipeSubsidyClaimed) return;
+  state.meta.wipeSubsidyClaimed = true;
+  state.player.gold += BALANCE.WIPE_SUBSIDY_GOLD;
+  const matParts: string[] = [];
+  for (const [mid, n] of Object.entries(BALANCE.WIPE_SUBSIDY_MATERIALS)) {
+    const count = n ?? 0;
+    if (count <= 0) continue;
+    state.inventory[mid] = (state.inventory[mid] ?? 0) + count;
+    matParts.push(`${MATERIALS[mid]?.icon ?? '📦'}${MATERIALS[mid]?.name ?? mid}×${count}`);
+  }
+  if (state.recruitment.visitors.length === 0) {
+    state.recruitment.nextVisitAt = Math.min(
+      state.recruitment.nextVisitAt,
+      state.meta.now + BALANCE.WIPE_SUBSIDY_VISIT_DELAY_MS,
+    );
+  }
+  pushLog(
+    state,
+    'system',
+    `🆘 酒馆理事会紧急拨款：金币 +${BALANCE.WIPE_SUBSIDY_GOLD}${matParts.length ? `、${matParts.join('、')}` : ''}。独自闯地牢太勉强了——去招募伙伴，组成小队再战！`,
+  );
 }
 
 /**

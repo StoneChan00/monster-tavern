@@ -12,6 +12,12 @@ export const BALANCE = {
   WELCOME_BACK_THRESHOLD_S: 120,
   /** 团灭后休整时长（宿舍每级 -10%，下限 50%） */
   REST_AFTER_WIPE_S: 120,
+  /** 首次团灭应急资助：金币 + 签约材料（初期难度缓冲，仅一次） */
+  WIPE_SUBSIDY_GOLD: 200,
+  /** 资助附带的签约材料（覆盖 Lv1~2 访客的签约需求） */
+  WIPE_SUBSIDY_MATERIALS: { mat_carapace: 4 },
+  /** 资助时若无客到访：最迟多少毫秒内安排一批（保证引导可完成） */
+  WIPE_SUBSIDY_VISIT_DELAY_MS: 60_000,
   /** 波次间休整秒数 */
   WAVE_REST_S: 3,
   /** 每波出 BOSS 的概率（纯随机；期望约 20 波一遇） */

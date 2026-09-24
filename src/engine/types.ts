@@ -9,7 +9,7 @@
  *   保证离线快进与在线经历完全一致的时间事件。
  */
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 export type ClassId = string;
 export type RaceId = string;
@@ -151,6 +151,8 @@ export interface GameState {
     monsterKills: Partial<Record<MonsterId, number>>;
     /** 累计出餐数（成就与统计页用） */
     dishesCooked: number;
+    /** 首次团灭应急资助是否已领取（仅一次：初期难度缓冲 + 招募引导） */
+    wipeSubsidyClaimed: boolean;
   };
   player: {
     gold: number;
