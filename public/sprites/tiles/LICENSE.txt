@@ -1,23 +1,23 @@
-	
 
-	Tiny Creatures (1.0)
+	Dungeon Floor Tiles (full-bleed textures, 16x16)
 
-	Created by Clint Bellanger (clintbellanger.net)
-	Creation date: 03-18-2024
+	Source: Tiny Dungeon
+	Created by Kenney (kenney.nl)
 
 			------------------------------
 
 	License: (Creative Commons Zero, CC0)
 	http://creativecommons.org/publicdomain/zero/1.0/
 
-	This content is free to use in personal, educational and commercial projects.
-	Support my work by crediting Clint Bellanger (this is not mandatory)
+	This content is free to use in personal, educational and commercial projects.
+	Crediting Kenney is appreciated but not mandatory.
 
 			------------------------------
 
- 	This set is an expansion of Kenney's Tiny Dungeon and Tiny Town:
-	https://kenney.nl/assets/tiny-dungeon
-	https://kenney.nl/assets/tiny-town
-	The included sample Tiled map and example images contain works by Kenney from these sets.
-
-	Made with Kenney's permission
+	Floor variants per map theme (2 base + 1 accent, mixed by position hash):
+	map1 mossy  = tan_slab / tan_flat / ornate
+	map2 mine   = stone_plain / stone_grid / stone_edge
+	map3 crypt  = brick / brown_flat / emblem
+	map4 lava   = tan_top / tan_flat2 / grate
+	map5 crystal= stone_grid / stone_plain / ornate
+	map6 void   = brick / slab_cracked / emblem

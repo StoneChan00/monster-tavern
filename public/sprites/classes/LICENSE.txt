@@ -1,0 +1,23 @@
+
+	Class & Monster Sprites (warrior/mage/priest/rogue/ranger/bard)
+
+	Source: Tiny Creatures (1.0)
+	Created by Clint Bellanger (clintbellanger.net)
+	Creation date: 03-18-2024
+
+			------------------------------
+
+	License: (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	This content is free to use in personal, educational and commercial projects.
+	Support my work by crediting Clint Bellanger (this is not mandatory)
+
+			------------------------------
+
+	Class mappings: warrior=knight(red), mage=witch, priest=angel,
+	rogue=catfolk, ranger=centaur, bard=satyr.
+
+	Extracted from the official packed tilemap (17x17 cells): brown-bg cells
+	chroma-keyed; purple-bg cells flood-keyed with the 2px purple outline
+	restored in place. See assets/README.md for the tooling notes.
