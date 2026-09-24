@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { createInitialState } from '../src/engine/initialState';
 import { tick } from '../src/engine/tick';
 import { applyOffline } from '../src/engine/offline';
@@ -28,6 +30,7 @@ import { MAP_DEFS, MONSTERS } from '../src/data/monsters';
 import { RECIPES } from '../src/data/recipes';
 import { MATERIALS } from '../src/data/materials';
 import { RACES } from '../src/data/races';
+import { CLASS_SPRITES, MONSTER_SPRITES } from '../src/data/sprites';
 import {
   ACHIEVEMENTS,
   totalMonsterKills,
@@ -1036,5 +1039,28 @@ describe('数值工具', () => {
     expect(fmtNum(999)).toBe('999');
     expect(fmtNum(1500)).toBe('1.5K');
     expect(fmtNum(1234567)).toBe('1.2M');
+  });
+});
+
+describe('精灵贴图完整性', () => {
+  it('53 种魔物与 6 职业全部有贴图文件（无 emoji 回退）', () => {
+    const root = join(process.cwd(), 'public', 'sprites');
+    expect(Object.keys(MONSTER_SPRITES)).toHaveLength(Object.keys(MONSTERS).length);
+    for (const [id, file] of Object.entries(MONSTER_SPRITES)) {
+      expect(existsSync(join(root, 'monsters', file)), `${id} -> ${file}`).toBe(true);
+    }
+    for (const [id, file] of Object.entries(CLASS_SPRITES)) {
+      expect(existsSync(join(root, 'classes', file)), `${id} -> ${file}`).toBe(true);
+    }
+  });
+
+  it('每张地图 ≥2 个地板变体且文件存在（基底+点缀混铺）', () => {
+    const root = join(process.cwd(), 'public', 'sprites', 'tiles');
+    for (const m of MAP_DEFS) {
+      expect(m.floorSprites.length, `${m.id} 地板变体数`).toBeGreaterThanOrEqual(2);
+      for (const f of m.floorSprites) {
+        expect(existsSync(join(root, f)), `${m.id} -> ${f}`).toBe(true);
+      }
+    }
   });
 });
