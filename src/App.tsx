@@ -41,7 +41,7 @@ export function App() {
           {tab === 'codex' && <CodexPanel />}
         </main>
         <footer className="pb-1 text-center text-[10px] text-[#6b5d48]">
-          进度自动保存在本浏览器 · 建议定期导出存档备份 · 魔物酒馆 Phase 1
+          进度自动保存在本浏览器 · 建议定期导出存档备份 · 魔物酒馆 v0.1.0 Demo
         </footer>
       </div>
       <WelcomeBackModal />
