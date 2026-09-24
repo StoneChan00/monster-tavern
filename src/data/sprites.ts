@@ -75,6 +75,13 @@ export const MONSTER_SPRITES: Record<keyof typeof MONSTERS, string> = {
   shade_lord: 'shade_lord.png', // 恶魔
   void_reaper: 'void_reaper.png', // 死亡骑士
   the_void_heart: 'the_void_heart.png', // 神明（终焉之心）
+  // ── v7 扩充普通怪 ──
+  muck_slug: 'muck_slug.png', // 淤泥怪
+  faerie: 'faerie.png', // 妖精
+  mummy: 'mummy.png', // 木乃伊
+  hellhound: 'hellhound.png', // 地狱犬
+  yeti: 'yeti.png', // 雪怪
+  void_imp: 'void_imp.png', // 小鬼
 };
 
 /** 职业角色图标（键类型取自 CLASSES；红骑士/女巫/天使/猫人/半人马/萨提尔） */
