@@ -4,14 +4,14 @@ import { useGameStore } from '../store/gameStore';
 import { RECIPES, CATEGORY_LABEL, type RecipeDef } from '../data/recipes';
 import { MATERIALS } from '../data/materials';
 import { CLASSES } from '../data/classes';
-import { menuConfig } from '../data/balance';
-import { activeMenuRecipes } from '../engine/stats';
+import { MENU_CONFIG, menuConfig } from '../data/balance';
+import { activeMenuRecipes, activeMenuStructures } from '../engine/stats';
 import { fmtDuration } from '../utils/format';
-import type { RecipeCategory } from '../data/recipes';
 
 /**
  * 厨房页签（v7 菜单制）：设置菜单 → 每小时消耗材料维持供给。
- * 厨房 1 级起菜单需覆盖必需类别（前菜/主菜/饮品…），结构满足才生效。
+ * 菜品效果随供料独立生效；满足结构（前菜+主菜+饮品…）获得**额外加成**，
+ * 结构嵌套（高级 ⊇ 低级），效果叠加。
  */
 export function KitchenPanel() {
   const s = useGameStore((st) => st.state);
@@ -19,21 +19,14 @@ export function KitchenPanel() {
   const [hint, setHint] = useState('');
   const nextCycle = Math.max(0, (s.kitchen.nextMenuCycleAt - s.meta.now) / 1000);
   const active = activeMenuRecipes(s);
-
-  const fedCategories = new Set(
-    s.kitchen.menu
-      .map((id, i) => (id && s.kitchen.menuFed[i] ? RECIPES[id]?.category : undefined))
-      .filter((c): c is RecipeCategory => c !== undefined),
-  );
-  const structureOk = cfg.required.every((c) => fedCategories.has(c));
-  const menuDishes = s.kitchen.menu.filter((x) => x !== null).length;
+  const structures = activeMenuStructures(s);
 
   return (
     <div className="space-y-3">
       <Panel
         title={
           <span className="flex flex-wrap items-baseline gap-x-2">
-            今日菜单（{menuDishes}/{cfg.slots} 道 · 每小时供料）
+            今日菜单（{s.kitchen.menu.filter((x) => x !== null).length}/{cfg.slots} 道 · 每小时供料）
             <span className="text-[10px] font-normal text-[#a89880]">
               下次供料 {fmtDuration(nextCycle)} 后
             </span>
@@ -42,29 +35,34 @@ export function KitchenPanel() {
         icon="🍳"
       >
         <div className="space-y-2 text-xs">
-          {/* 结构说明 */}
-          <div
-            className={`border-2 p-2 text-[11px] leading-relaxed ${
-              structureOk && active.length > 0
-                ? 'border-[#4a6b2f] bg-[#1d2415] text-[#a5d47a]'
-                : 'border-[#3a2d1e] bg-[#1f1812] text-[#a89880]'
-            }`}
-          >
-            {cfg.required.length === 0 ? (
-              <>厨房 Lv.0：任意 {cfg.slots} 道菜即可生效，无结构要求。</>
-            ) : (
-              <>
-                厨房 Lv.{s.tavern.kitchen} 结构要求：
-                {cfg.required.map((c) => (
-                  <span key={c} className={fedCategories.has(c) ? 'text-[#a5d47a]' : 'text-[#c0392b]'}>
-                    {' '}
-                    {CATEGORY_LABEL[c]}
-                    {fedCategories.has(c) ? '✓' : '✗'}
-                  </span>
-                ))}
-                {structureOk ? ' —— 菜单生效中' : ' —— 结构不满足，菜单整体暂停'}
-              </>
-            )}
+          {/* 结构加成（嵌套：满足高级自动满足低级，效果叠加） */}
+          <div className="border-2 border-[#3a2d1e] bg-[#141009] p-2">
+            <div className="mb-1 text-[10px] font-bold text-[#a89880]">
+              结构加成（满足类别要求即生效，可叠加）
+            </div>
+            <div className="space-y-0.5">
+              {[1, 2, 3, 4].map((lv) => {
+                const m = MENU_CONFIG[lv];
+                const on = structures.includes(lv);
+                const locked = s.tavern.kitchen < lv;
+                return (
+                  <div
+                    key={lv}
+                    className={`flex items-baseline justify-between text-[11px] ${
+                      on ? 'text-[#a5d47a]' : locked ? 'text-[#5b4d3a]' : 'text-[#a89880]'
+                    }`}
+                  >
+                    <span>
+                      {on ? '✓' : locked ? '🔒' : '·'} {m.bonus.name}（{m.required.length} 类：{m.required.map((c) => CATEGORY_LABEL[c]).join('+')}）
+                    </span>
+                    <span>{m.bonus.desc}</span>
+                  </div>
+                );
+              })}
+              {s.tavern.kitchen === 0 ? (
+                <div className="text-[10px] text-[#6b5d48]">升级厨房解锁更多槽位与结构加成</div>
+              ) : null}
+            </div>
           </div>
 
           {/* 菜单槽位 */}
@@ -77,23 +75,31 @@ export function KitchenPanel() {
           {/* 生效增益 */}
           <div className="border-2 border-[#3a2d1e] bg-[#141009] p-2">
             <div className="mb-1 text-[10px] font-bold text-[#a89880]">
-              当前生效效果（{active.length} 道）
+              当前生效效果（{active.length} 道菜{structures.length > 0 ? ` + ${structures.length} 级结构` : ''}）
             </div>
-            {active.length === 0 ? (
+            {active.length === 0 && structures.length === 0 ? (
               <div className="text-[11px] text-[#5b4d3a]">暂无——设菜并保持供料</div>
             ) : (
-              active.map((id) => {
-                const r = RECIPES[id];
-                if (!r) return null;
-                return (
-                  <div key={id} className="flex justify-between text-[11px]">
-                    <span className="text-[#f0d78c]">
-                      {r.icon} {r.name}（{CATEGORY_LABEL[r.category]}）
-                    </span>
-                    <span className="text-[#a89880]">{r.buff.label}</span>
+              <>
+                {active.map((id) => {
+                  const r = RECIPES[id];
+                  if (!r) return null;
+                  return (
+                    <div key={id} className="flex justify-between text-[11px]">
+                      <span className="text-[#f0d78c]">
+                        {r.icon} {r.name}（{CATEGORY_LABEL[r.category]}）
+                      </span>
+                      <span className="text-[#a89880]">{r.buff.label}</span>
+                    </div>
+                  );
+                })}
+                {structures.map((lv) => (
+                  <div key={lv} className="flex justify-between text-[11px]">
+                    <span className="text-[#a5d47a]">🍽️ {MENU_CONFIG[lv].bonus.name}</span>
+                    <span className="text-[#a5d47a]">{MENU_CONFIG[lv].bonus.desc}</span>
                   </div>
-                );
-              })
+                ))}
+              </>
             )}
           </div>
           {hint ? <div className="text-[11px] text-[#c0392b]">{hint}</div> : null}
