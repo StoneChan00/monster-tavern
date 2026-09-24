@@ -110,6 +110,30 @@ body {
   animation: bubble 0.8s ease-in-out infinite;
 }
 
+/* 引导脉冲：招募面板 / 设施卡定位高亮（金色描边呼吸 4 次） */
+@keyframes guide-flash {
+  0%,
+  100% {
+    border-color: #3a2d1e;
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  }
+  50% {
+    border-color: #d9a441;
+    box-shadow: 0 0 0 3px rgba(217, 164, 65, 0.3), 4px 4px 0 rgba(0, 0, 0, 0.45);
+  }
+}
+
+.guide-flash {
+  animation: guide-flash 0.9s ease-in-out 4;
+}
+
+/* 酒馆地图：木地板纹路（横板 + 板缝，叠加在房间底色上） */
+.tavern-plank {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 20px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 46px);
+}
+
 /* 下拉选择器（编队指派） */
 .pixel-select {
   border: 2px solid #5c4325;
