@@ -464,8 +464,8 @@ export interface MapDef {
   bossPool: MonsterId[];
   /** 首杀本图 BOSS 获得的声望 */
   firstClearReputation: number;
-  /** 主题地板贴图（public/sprites/tiles/ 下文件名） */
-  floorSprite: string;
+  /** 主题地板贴图（public/sprites/tiles/ 下文件名）：[基底A, 基底B, 点缀]，战斗视口按位置哈希混铺 */
+  floorSprites: string[];
   /** PixiJS tint 主题色（叠加在地板贴图上做主题差异） */
   floorTint: number;
 }
@@ -481,42 +481,42 @@ export const MAP_DEFS: MapDef[] = [
     monsterPool: ['slime', 'bat', 'mushroom', 'big_slime', 'venom_bat', 'rock_crab', 'spore_mushroom', 'moss_wolf', 'cave_lizard'],
     bossPool: ['slime_king', 'bat_lord', 'crab_king', 'wolf_alpha'],
     firstClearReputation: 5,
-    floorSprite: 'floor_mossy.png', floorTint: 0xb8d8b8,
+    floorSprites: ['floor_tan_slab.png', 'floor_tan_flat.png', 'floor_ornate.png'], floorTint: 0xb8d8b8,
   },
   {
     id: 'map_2', number: 2, name: '秘银矿道', icon: '⛏️',
     monsterPool: ['glow_jelly', 'stone_golem', 'shadow_spider', 'iron_beetle', 'moss_wolf', 'cave_lizard', 'rock_crab'],
     bossPool: ['golem_guard', 'weaver_queen'],
     firstClearReputation: 20,
-    floorSprite: 'floor_mine.png', floorTint: 0xa8c4e0,
+    floorSprites: ['floor_stone_plain.png', 'floor_stone_grid.png', 'floor_stone_edge.png'], floorTint: 0xa8c4e0,
   },
   {
     id: 'map_3', number: 3, name: '骸骨墓穴', icon: '💀',
     monsterPool: ['skeleton', 'man_eater', 'shadow_spider', 'iron_beetle', 'spore_mushroom'],
     bossPool: ['skeleton_captain'],
     firstClearReputation: 30,
-    floorSprite: 'floor_crypt.png', floorTint: 0xb0a8c8,
+    floorSprites: ['floor_brick.png', 'floor_brown_flat.png', 'floor_emblem.png'], floorTint: 0xb0a8c8,
   },
   {
     id: 'map_4', number: 4, name: '熔岩裂隙', icon: '🔥',
     monsterPool: ['acid_slime', 'cave_troll', 'wraith', 'basilisk', 'shadow_hunter', 'abyss_tentacle', 'obsidian_golem'],
     bossPool: ['troll_warlord', 'wraith_lord', 'nightmare'],
     firstClearReputation: 42,
-    floorSprite: 'floor_lava.png', floorTint: 0xe0a888,
+    floorSprites: ['floor_tan_top.png', 'floor_tan_flat2.png', 'floor_grate.png'], floorTint: 0xe0a888,
   },
   {
     id: 'map_5', number: 5, name: '水晶回廊', icon: '💠',
     monsterPool: ['crystal_slime', 'crystal_bat', 'void_spider', 'ice_lizard', 'gem_golem', 'amethyst_beetle', 'wraith'],
     bossPool: ['crystal_mother', 'gem_titan', 'void_weaver', 'frost_basilisk', 'crystal_beetle_king'],
     firstClearReputation: 60,
-    floorSprite: 'floor_crystal.png', floorTint: 0x98d8e8,
+    floorSprites: ['floor_stone_grid.png', 'floor_stone_plain.png', 'floor_ornate.png'], floorTint: 0x98d8e8,
   },
   {
     id: 'map_6', number: 6, name: '虚空终焉', icon: '🌌',
     monsterPool: ['mind_flayer', 'void_wraith', 'purple_worm', 'nightmare_shade', 'void_heart_larva'],
     bossPool: ['elder_flayer', 'void_reaper', 'crystal_dragon', 'shade_lord', 'the_void_heart'],
     firstClearReputation: 85,
-    floorSprite: 'floor_void.png', floorTint: 0x9888c8,
+    floorSprites: ['floor_brick.png', 'floor_slab_cracked.png', 'floor_emblem.png'], floorTint: 0x9888c8,
   },
 ];
 
