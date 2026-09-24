@@ -33,7 +33,11 @@
 
 ## 关键技术备忘
 
-- **素材已入库**：`assets/packs/` 6 个 CC0 包（见 `assets/README.md`）——Tiny Creatures 180 魔物（同风格补图主力）、Roguelike Indoor 480 家具（酒馆视觉）、16x16 Food 188 食物图标（菜谱/酒窖线）、Puny Dungeon/Characters、Tiny Town。**sheet 有 1px 间距**（网格步进 17px），优先用各包 `Tiles/` 独立 PNG；魔物默认朝右，BattleViewport 镜像惯例直接兼容；itch.io 本机不可达时走 OGA 直链（README 有复下载直链）
+- **精灵切片管线（本轮重建，工具在 `assets/tools/`）**：tiny-creatures 的 `Tiles/` 个体文件被量化污染（黑/紫/棕混合底，**不可直接用**）；正确源是官方 packed tilemap（17×17 格，1-based 编号与 Tilesheet.txt 顺序一致）。**棕底格**（行 0-8，#1-90）抠棕即得（紫描边完好）；**紫底格**（行 9-17，#91-180）洪泛抠紫 + 原位还原描边内层（被抠紫像素邻接存活即恢复）+ 1px 四邻域外扩描边外层 + 回填封闭孔洞（保眼睛等细节）。`dump.cjs` 文本像素画（多模态挂时的目检替代）、`census.cjs` 全包普查、`export3.cjs` 导出器
+- **贴图现状**：53 魔物 + 6 职业 **全覆盖**（`MONSTER_SPRITES` 键类型取自 `MONSTERS`，漏配编译报错；文件存在性由测试守护）；职业=红骑士/女巫/天使/猫人/半人马/萨提尔；同图内不重复借形，跨图复用靠 tint 区分（映射注释在 sprites.ts）。旧职业贴图全是错拷的门/箱子/墙块（tile 0-6 按序命名），旧 6 张"地板"是带透明缺角的物件块——均已替换删除
+- **地板混铺**：每图 2 基底 + 1 点缀（`MAP_DEFS.floorSprites`），BattleViewport 按位置哈希选变体（60%/28%/12%），稳定不闪烁；13 张全铺纹理来自 Kenney Tiny Dungeon 官方 Tiles（36/37/39 石纹系、42/43/48/49 沙岩系、52/75 棕砖系、63/70/91 花纹点缀、30 格栅）
+- **像素级冒烟**：`pw-smoke/smoke-sprites.cjs`——截图战斗视口 → 直方图验证地板 ≥3 显著色调（旧单一贴图仅 1-2）+ 队伍侧红甲/魔物侧彩色像素存在性
+- **素材已入库**：`assets/packs/` 7 个 CC0 包（见 `assets/README.md`）——Tiny Creatures 180 魔物、**Tiny Dungeon 官方 132 tiles（本轮地板/切片源）**、Roguelike Indoor 480 家具、16x16 Food 188 食物图标（菜谱/酒窖线）、Puny Dungeon/Characters、Tiny Town。itch.io 本机不可达时走 OGA 直链（README 有复下载直链）
 - **node PATH 前缀（每条命令必须）**：`$env:Path = "D:\1_Sotfware\Nodejs;C:\Users\chens\AppData\Roaming\npm;" + $env:Path`
 - 命令：`pnpm dev`（5173）/ `pnpm build` / `pnpm test`
 - 架构分层：`engine/`（纯函数模拟）→ `store/`（Zustand 唯一状态所有者）→ `ui/`；`data/` 全部类型化内容；战斗事件流 `state.events`（瞬态，serialize 剥离）
