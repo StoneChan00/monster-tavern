@@ -4,13 +4,15 @@ import { CharacterSprite } from './CharacterSprite';
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
-import { LEVEL_UP_COST, wageOfLevel } from '../data/balance';
+import { BALANCE, LEVEL_UP_COST, wageOfLevel } from '../data/balance';
 import { MATERIALS } from '../data/materials';
 import { expToNext, getAdventurerStats, levelTier } from '../engine/stats';
 import { LEVEL_CAP } from '../engine/types';
 import type { AdventurerState } from '../engine/types';
 
-/** 冒险者详情卡（编队/替补通用）：D&D 等级制，经验满可花金币+材料进行升级仪式 */
+const ROW_LABEL: Record<string, string> = { front: '前排', mid: '中排', back: '后排' };
+
+/** 冒险者详情卡（宿舍名册通用）：D&D 等级制，经验满可花金币+材料进行升级仪式 */
 export function AdventurerCard({ adv }: { adv: AdventurerState }) {
   const s = useGameStore((st) => st.state);
   const cls = CLASSES[adv.classId];
@@ -19,7 +21,9 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
   const atCap = adv.level >= LEVEL_CAP;
   const expReady = adv.exp >= need;
   const hp = Math.min(adv.hp, stats.hp);
-  const inParty = s.party.includes(adv.id);
+  const slot = s.party.indexOf(adv.id);
+  const inParty = slot >= 0;
+  const rowLabel = inParty ? (ROW_LABEL[BALANCE.SLOT_ROWS[slot]] ?? '') : '';
   const wage = wageOfLevel(adv.level);
   const tier = levelTier(adv.level);
   const cost = atCap ? null : LEVEL_UP_COST[adv.level - 1] ?? null;
@@ -51,7 +55,11 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
         <div className="flex items-baseline justify-between">
           <span className="text-[#a89880]">
             {RACES[adv.race]?.name ?? '人类'} · {cls.name} · {cls.role.split(' / ')[0]}
-            {inParty ? ' · ⚑ 出征中' : ' · 替补'}
+            {inParty ? (
+              <span className="font-bold text-[#8fbf6a]"> · ⚔️ 队伍中{rowLabel ? `（${rowLabel}）` : ''}</span>
+            ) : (
+              <span className="text-[#c9b28a]"> · 🛏️ 休息中</span>
+            )}
           </span>
           <span className="font-bold text-[#f0d78c]">
             Lv.{adv.level}
