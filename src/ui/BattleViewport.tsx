@@ -525,9 +525,9 @@ export function BattleViewport() {
       };
       const initW = Math.max(240, host.clientWidth);
       dimLayer = new Graphics().rect(0, BACKDROP_BAND_H, initW, VIEW_H - BACKDROP_BAND_H).fill({ color: 0x141009, alpha: 0.4 });
-      // z 序：背景 0 / 地板 1 / 装饰 2 / 压暗 3 / 单位 4 / 前景 5
-      app.stage.addChildAt(backdropLayer, 0);
-      app.stage.addChildAt(propsLayer, 2);
+      // z 序按加入顺序：背景 / 装饰 / 压暗 / 单位 / 前景；地板层由 buildScene 以 addChildAt(layer, 1) 插到背景与装饰之间
+      app.stage.addChild(backdropLayer);
+      app.stage.addChild(propsLayer);
       app.stage.addChild(dimLayer);
       app.stage.addChild(unitLayer);
       app.stage.addChild(fgLayer);
