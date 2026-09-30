@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Panel } from './Panel';
 import { useGameStore } from '../store/gameStore';
+import { GameIcon } from './GameIcon';
 import { RECIPES, CATEGORY_LABEL, type RecipeDef } from '../data/recipes';
 import { MATERIALS } from '../data/materials';
 import { CLASSES } from '../data/classes';
@@ -86,8 +87,9 @@ export function KitchenPanel() {
                   if (!r) return null;
                   return (
                     <div key={id} className="flex justify-between text-[11px]">
-                      <span className="text-[#f0d78c]">
-                        {r.icon} {r.name}（{CATEGORY_LABEL[r.category]}）
+                      <span className="flex items-center gap-1 text-[#f0d78c]">
+                        <GameIcon sprite={r.sprite} fallback={r.icon} size={14} />
+                        {r.name}（{CATEGORY_LABEL[r.category]}）
                       </span>
                       <span className="text-[#a89880]">{r.buff.label}</span>
                     </div>
@@ -137,8 +139,8 @@ function MenuSlot({ slot, onHint }: { slot: number; onHint: (h: string) => void 
     >
       {r ? (
         <div className="mb-1 flex items-baseline justify-between">
-          <span className={`text-xs font-bold ${fed ? 'text-[#a5d47a]' : 'text-[#f0d78c]'}`}>
-            {r.icon} {r.name}
+          <span className={`flex items-center gap-1 text-xs font-bold ${fed ? 'text-[#a5d47a]' : 'text-[#f0d78c]'}`}>
+            <GameIcon sprite={r.sprite} fallback={r.icon} size={16} /> {r.name}
             <span className="ml-1 text-[10px] font-normal text-[#a89880]">{CATEGORY_LABEL[r.category]}</span>
           </span>
           <span className={`text-[10px] ${fed ? 'text-[#a5d47a]' : 'text-[#c0392b]'}`}>
@@ -162,9 +164,8 @@ function MenuSlot({ slot, onHint }: { slot: number; onHint: (h: string) => void 
         <div className="mt-1 text-[10px] text-[#a89880]">
           效果 {r.buff.label} · 每小时：
           {Object.entries(r.cost.materials).map(([mid, need]) => (
-            <span key={mid}>
-              {' '}
-              {MATERIALS[mid]?.icon}
+            <span key={mid} className="inline-flex items-center gap-0.5">
+              <GameIcon sprite={MATERIALS[mid]?.sprite} fallback={MATERIALS[mid]?.icon ?? '📦'} size={12} />
               {MATERIALS[mid]?.name}×{need}
             </span>
           ))}
@@ -211,8 +212,9 @@ function RecipeCard({ recipe }: { recipe: RecipeDef }) {
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-bold">
-          {recipe.icon} {recipe.name}
+        <span className="flex items-center gap-1 font-bold">
+          <GameIcon sprite={recipe.sprite} fallback={recipe.icon} size={16} />
+          {recipe.name}
           <span className="ml-1 text-[10px] font-normal text-[#a89880]">{CATEGORY_LABEL[recipe.category]}</span>
         </span>
         {onMenu ? <span className="text-[10px] text-[#a5d47a]">在菜单</span> : null}

@@ -32,7 +32,8 @@ import { ELITE_SIGIL, MAP_DEFS, MONSTERS } from '../src/data/monsters';
 import { RECIPES } from '../src/data/recipes';
 import { MATERIALS } from '../src/data/materials';
 import { RACES } from '../src/data/races';
-import { CLASS_SPRITES, MONSTER_SPRITES } from '../src/data/sprites';
+import { FACILITIES } from '../src/data/upgrades';
+import { CLASS_SPRITES, ELITE_SPRITES, MONSTER_SPRITES } from '../src/data/sprites';
 import {
   ACHIEVEMENTS,
   totalMonsterKills,
@@ -1201,6 +1202,56 @@ describe('精灵贴图完整性', () => {
       for (const f of m.floorSprites) {
         expect(existsSync(join(root, f)), `${m.id} -> ${f}`).toBe(true);
       }
+    }
+  });
+});
+
+describe('图标贴图完整性', () => {
+  const root = join(process.cwd(), 'public', 'sprites');
+
+  it('全部菜谱/材料/成就/地图/设施 sprite 指向真实文件', () => {
+    const missing: string[] = [];
+    const check = (id: string, sprite?: string) => {
+      if (sprite && !existsSync(join(root, sprite))) missing.push(`${id} -> ${sprite}`);
+    };
+    for (const m of Object.values(MATERIALS)) check(m.id, m.sprite);
+    for (const r of Object.values(RECIPES)) check(r.id, r.sprite);
+    for (const a of ACHIEVEMENTS) check(a.id, a.sprite);
+    for (const m of MAP_DEFS) check(m.id, m.sprite);
+    for (const f of Object.values(FACILITIES)) check(f.id, f.sprite);
+    expect(missing).toEqual([]);
+  });
+
+  it('菜谱与材料全覆盖 sprite（无 emoji 回退）', () => {
+    for (const m of Object.values(MATERIALS)) {
+      expect(m.sprite, `材料 ${m.id}`).toBeTruthy();
+    }
+    for (const r of Object.values(RECIPES)) {
+      expect(r.sprite, `菜谱 ${r.id}`).toBeTruthy();
+    }
+    for (const a of ACHIEVEMENTS) {
+      expect(a.sprite, `成就 ${a.id}`).toBeTruthy();
+    }
+    for (const m of MAP_DEFS) {
+      expect(m.sprite, `地图 ${m.id}`).toBeTruthy();
+    }
+  });
+
+  it('精英变体贴图全部存在（ELITE_SPRITES 派生自 elitePool 原生 BOSS）', () => {
+    const monstersRoot = join(process.cwd(), 'public', 'sprites', 'monsters');
+    for (const m of MAP_DEFS) {
+      for (const eid of m.elitePool) {
+        const file = ELITE_SPRITES[eid];
+        expect(file, `精英 ${eid} 贴图映射`).toBeTruthy();
+        expect(existsSync(join(monstersRoot, file!)), `${eid} -> ${file}`).toBe(true);
+      }
+    }
+  });
+
+  it('9 种族徽章贴图全部存在', () => {
+    for (const r of Object.values(RACES)) {
+      expect(r.sprite, `种族 ${r.id}`).toBeTruthy();
+      expect(existsSync(join(root, r.sprite!)), `${r.id} -> ${r.sprite}`).toBe(true);
     }
   });
 });

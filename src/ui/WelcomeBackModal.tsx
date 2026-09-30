@@ -1,4 +1,5 @@
 import { useGameStore } from '../store/gameStore';
+import { GameIcon } from './GameIcon';
 import { MATERIALS } from '../data/materials';
 import { fmtDuration, fmtNum } from '../utils/format';
 
@@ -46,7 +47,12 @@ export function WelcomeBackModal() {
               {Object.entries(report.materials).map(([id, n]) => (
                 <Row
                   key={id}
-                  label={`${MATERIALS[id]?.icon ?? '📦'} ${MATERIALS[id]?.name ?? id}`}
+                  label={
+                    <span className="inline-flex items-center gap-1">
+                      <GameIcon sprite={MATERIALS[id]?.sprite} fallback={MATERIALS[id]?.icon ?? '📦'} size={12} />
+                      {MATERIALS[id]?.name ?? id}
+                    </span>
+                  }
                   value={`+${n}`}
                 />
               ))}
@@ -62,7 +68,7 @@ export function WelcomeBackModal() {
   );
 }
 
-function Row({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+function Row({ label, value, highlight = false }: { label: React.ReactNode; value: string; highlight?: boolean }) {
   return (
     <div className="flex justify-between">
       <span className="text-[#a89880]">{label}</span>

@@ -1,0 +1,9 @@
+本目录图标为两层来源（生成管线见 assets/tools/gen-icons.cjs 与 docs/STYLE.md §5）：
+
+1. 素材包加工（部分菜谱/食材图标，经描边加深 + 外扩处理）：
+   16x16 Food（Hamletum 调色板）
+   来源：https://opengameart.org/content/16x16-food
+   许可：CC0（公有领域）
+
+2. 程序化自绘（饮品/魔物食材/建材/魔核/徽记/地图/成就图标）：
+   由 assets/tools/icon-grids.cjs 的像素网格生成，项目原创，许同项目整体许可。

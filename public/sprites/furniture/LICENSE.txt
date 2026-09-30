@@ -1,0 +1,2 @@
+本目录为程序化合成的房间场景贴图（32×32，生成管线见 assets/tools/gen-furniture.cjs）：
+项目原创，许同项目整体许可。风格规范见 docs/STYLE.md。

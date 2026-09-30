@@ -5,7 +5,7 @@ import { BALANCE } from '../data/balance';
 import { CLASSES } from '../data/classes';
 import { MONSTERS } from '../data/monsters';
 import { MAPS, MAP_DEFS } from '../data/monsters';
-import { CLASS_SPRITES, MONSTER_SPRITES } from '../data/sprites';
+import { CLASS_SPRITES, ELITE_SPRITES, MONSTER_SPRITES } from '../data/sprites';
 import { getPartyMembers } from '../engine/party';
 import type { ClassId, EventRecord, GameState, MonsterId } from '../engine/types';
 
@@ -18,6 +18,8 @@ const PARTY_X = 64;
 const MONSTER_X_OFFSET = 74;
 /** 地板格：16px 贴图 × 2 倍缩放 */
 const FLOOR_CELL = 32;
+/** 与 index.css 的 --font-pixel 保持一致（emoji 经系统回退渲染） */
+const PIXEL_FONT = '"Fusion Pixel 12px", "Segoe UI", "PingFang SC", sans-serif';
 const MAX_QUEUE = 12; // 超过则丢弃旧事件（离线积压场景）
 const KEEP_ON_OVERFLOW = 4;
 const CLAMP_DT_MS = 100;
@@ -55,6 +57,7 @@ export function BattleViewport() {
     const floorTextures = new Map<string, Texture>();
     const textureCache = new Map<MonsterId, Texture>();
     const classTextureCache = new Map<ClassId, Texture>();
+    const eliteTextureCache = new Map<string, Texture>();
     /** 变体混铺地板层（Container of Sprite，位置哈希选变体） */
     let floorLayer: Container | null = null;
     let dimLayer: Graphics | null = null;
@@ -82,9 +85,9 @@ export function BattleViewport() {
       if (!u.root.destroyed) u.root.destroy({ children: true });
     };
 
-    const makeIcon = (monsterId?: MonsterId, classId?: string): Sprite | Text => {
+    const makeIcon = (monsterId?: MonsterId, classId?: string, isElite?: boolean): Sprite | Text => {
       if (monsterId) {
-        const tex = textureCache.get(monsterId);
+        const tex = isElite ? eliteTextureCache.get(monsterId) : textureCache.get(monsterId);
         if (tex) {
           const sp = new Sprite(tex);
           sp.anchor.set(0.5);
@@ -93,8 +96,8 @@ export function BattleViewport() {
           return sp;
         }
         return new Text({
-          text: MONSTERS[monsterId]?.icon ?? '❔',
-          style: { fontFamily: 'sans-serif', fontSize: 30 },
+        text: MONSTERS[monsterId]?.icon ?? '❔',
+        style: { fontFamily: PIXEL_FONT, fontSize: 30 },
         });
       }
       const classTex = classId ? classTextureCache.get(classId) : undefined;
@@ -106,7 +109,7 @@ export function BattleViewport() {
       }
       return new Text({
         text: CLASSES[classId ?? 'warrior']?.icon ?? '🧑',
-        style: { fontFamily: 'sans-serif', fontSize: 30 },
+        style: { fontFamily: PIXEL_FONT, fontSize: 30 },
       });
     };
 
@@ -156,7 +159,7 @@ export function BattleViewport() {
     };
 
     const buildMonsters = (
-      list: Array<{ uid: number; monsterId: MonsterId }>,
+      list: Array<{ uid: number; monsterId: MonsterId; elite?: boolean }>,
       animate: boolean,
     ): void => {
       for (const u of monsterUnits.values()) destroyUnit(u);
@@ -164,7 +167,7 @@ export function BattleViewport() {
       const mx = stageWidth() - MONSTER_X_OFFSET;
       list.forEach((m, i) => {
         const root = new Container();
-        root.addChild(makeIcon(m.monsterId));
+        root.addChild(makeIcon(m.monsterId, undefined, m.elite));
         const y = spreadY(i, list.length);
         root.position.set(mx, y);
         app.stage.addChild(root);
@@ -201,7 +204,7 @@ export function BattleViewport() {
       }
       const t = new Text({
         text,
-        style: { fontFamily: 'sans-serif', fontSize: 15, fontWeight: 'bold', fill: color },
+        style: { fontFamily: PIXEL_FONT, fontSize: 15, fontWeight: 'bold', fill: color },
       });
       t.anchor.set(0.5);
       t.position.set(stageWidth() / 2, VIEW_H / 2);
@@ -219,7 +222,7 @@ export function BattleViewport() {
       const t = new Text({
         text,
         style: {
-          fontFamily: 'sans-serif',
+          fontFamily: PIXEL_FONT,
           fontSize: big ? 18 : 13,
           fontWeight: 'bold',
           fill: color,
@@ -332,10 +335,12 @@ export function BattleViewport() {
         `${import.meta.env.BASE_URL}sprites/${kind}/${file}`;
       const monsterEntries = Object.entries(MONSTER_SPRITES);
       const classEntries = Object.entries(CLASS_SPRITES);
+      const eliteEntries = Object.entries(ELITE_SPRITES).filter((e): e is [string, string] => !!e[1]);
       try {
         const urls = [
           ...monsterEntries.map(([, file]) => spriteUrl('monsters', file)),
           ...classEntries.map(([, file]) => spriteUrl('classes', file)),
+          ...eliteEntries.map(([, file]) => spriteUrl('monsters', file)),
           ...FLOOR_SPRITE_FILES.map((file) => spriteUrl('tiles', file)),
         ];
         const textures = await Assets.load(urls);
@@ -344,6 +349,13 @@ export function BattleViewport() {
           if (tex) {
             tex.source.scaleMode = 'nearest';
             textureCache.set(id as MonsterId, tex);
+          }
+        }
+        for (const [id, file] of eliteEntries) {
+          const tex = textures[spriteUrl('monsters', file)];
+          if (tex) {
+            tex.source.scaleMode = 'nearest';
+            eliteTextureCache.set(id, tex);
           }
         }
         for (const [id, file] of classEntries) {
@@ -431,7 +443,9 @@ export function BattleViewport() {
       buildFloor(state0);
       layoutParty(state0);
       buildMonsters(
-        state0.dungeon.monsters.filter((m) => m.hp > 0).map((m) => ({ uid: m.uid, monsterId: m.monsterId })),
+        state0.dungeon.monsters
+          .filter((m) => m.hp > 0)
+          .map((m) => ({ uid: m.uid, monsterId: m.monsterId, elite: m.elite !== undefined })),
         false,
       );
       lastEventId = state0.events.length > 0 ? state0.events[state0.events.length - 1].id : 0;

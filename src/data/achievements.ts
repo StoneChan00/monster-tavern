@@ -14,6 +14,8 @@ export interface AchievementDef {
   name: string;
   desc: string;
   icon: string;
+  /** 像素贴图（public/sprites/items/ 下相对路径） */
+  sprite?: string;
   check: (state: GameState) => boolean;
 }
 
@@ -44,6 +46,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '开门营业',
     desc: '肃清第一波魔物',
     icon: '🍺',
+    sprite: 'items/ach_open_for_business.png',
     check: (s) => s.meta.totalWavesCleared >= 1,
   },
   {
@@ -51,6 +54,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '小队初成',
     desc: '酒馆雇佣 3 名冒险者',
     icon: '🧑‍🤝‍🧑',
+    sprite: 'items/ach_first_squad.png',
     check: (s) => s.roster.length >= 3,
   },
   {
@@ -58,6 +62,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '满编出征',
     desc: '5 个编队槽位全部就位',
     icon: '⚔️',
+    sprite: 'items/ach_full_party.png',
     check: (s) => s.party.length >= 5 && s.party.every((x) => x !== null),
   },
   {
@@ -65,6 +70,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '深入矿道',
     desc: '首次讨伐秘银矿道（图2）的精英',
     icon: '⛏️',
+    sprite: 'items/ach_map_2.png',
     check: (s) => clearedMap(s, 2),
   },
   {
@@ -72,6 +78,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '深入裂隙',
     desc: '首次讨伐熔岩裂隙（图4）的精英',
     icon: '🔥',
+    sprite: 'items/ach_map_4.png',
     check: (s) => clearedMap(s, 4),
   },
   {
@@ -79,6 +86,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '终焉征服者',
     desc: '首次讨伐虚空终焉（图6）的精英',
     icon: '🌌',
+    sprite: 'items/ach_map_6.png',
     check: (s) => clearedMap(s, 6),
   },
   {
@@ -86,6 +94,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '魔物克星',
     desc: '累计击杀 50 只魔物',
     icon: '🗡️',
+    sprite: 'items/ach_slayer_50.png',
     check: (s) => killsAtLeast(s, 50),
   },
   {
@@ -93,6 +102,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '百魔斩',
     desc: '累计击杀 100 只魔物',
     icon: '💀',
+    sprite: 'items/ach_slayer_100.png',
     check: (s) => killsAtLeast(s, 100),
   },
   {
@@ -100,6 +110,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '千魔斩',
     desc: '累计击杀 1000 只魔物',
     icon: '☠️',
+    sprite: 'items/ach_slayer_1000.png',
     check: (s) => killsAtLeast(s, 1000),
   },
   {
@@ -107,6 +118,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '精英猎手',
     desc: '讨伐 10 只精英怪',
     icon: '🐉',
+    sprite: 'items/ach_boss_slayer.png',
     check: (s) => s.meta.totalBossKills >= 10,
   },
   {
@@ -114,6 +126,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '魔物美食家',
     desc: `解锁全部 ${Object.keys(RECIPES).length} 道菜谱`,
     icon: '🍽️',
+    sprite: 'items/ach_gourmet.png',
     check: (s) => s.kitchen.unlockedRecipes.length >= Object.keys(RECIPES).length,
   },
   {
@@ -121,6 +134,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '宴席常开',
     desc: '累计出餐 50 次',
     icon: '🍲',
+    sprite: 'items/ach_feast_50.png',
     check: (s) => s.meta.dishesCooked >= 50,
   },
   {
@@ -128,6 +142,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '日进斗金',
     desc: '累计赚取 10000 金币',
     icon: '💰',
+    sprite: 'items/ach_gold_10k.png',
     check: (s) => s.meta.lifetimeGoldEarned >= 10_000,
   },
   {
@@ -135,6 +150,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '传奇之约',
     desc: '与 10 级（传奇）冒险者签约——整个世界屈指可数',
     icon: '✨',
+    sprite: 'items/ach_legendary_pact.png',
     check: (s) => s.roster.some((a) => a.level >= 10),
   },
   {
@@ -142,6 +158,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '万国来朝',
     desc: `同时拥有 ${RACE_LIST.length} 大种族的冒险者`,
     icon: '🌍',
+    sprite: 'items/ach_nine_races.png',
     check: (s) => new Set(s.roster.map((a) => a.race)).size >= RACE_LIST.length,
   },
   {
@@ -149,6 +166,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '见多识广',
     desc: `图鉴收录过半魔物（${Math.ceil(MONSTER_SPECIES_COUNT / 2)}/${MONSTER_SPECIES_COUNT}）`,
     icon: '📖',
+    sprite: 'items/ach_codex_half.png',
     check: (s) => discoveredMonsterCount(s) >= Math.ceil(MONSTER_SPECIES_COUNT / 2),
   },
   {
@@ -156,6 +174,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     name: '魔物百科',
     desc: `图鉴收录全部魔物（${MONSTER_SPECIES_COUNT} 种）`,
     icon: '📚',
+    sprite: 'items/ach_codex_full.png',
     check: (s) => discoveredMonsterCount(s) >= MONSTER_SPECIES_COUNT,
   },
 ];

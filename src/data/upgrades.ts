@@ -19,6 +19,8 @@ export interface FacilityDef {
   id: FacilityId;
   name: string;
   icon: string;
+  /** 像素贴图（public/sprites/ui/ 下相对路径） */
+  sprite?: string;
   /** 当前等级的效果描述（UI 展示） */
   describe: (level: number) => string;
   maxLevel: number;
@@ -31,6 +33,7 @@ export const LOUNGE: FacilityDef = {
   id: 'lounge',
   name: '招待区',
   icon: '🪑',
+  sprite: 'ui/ui_facility_lounge.png',
   describe: (lv) => `替补席 ${4 + lv} 人 · 每批到访 ${2 + Math.floor(lv / 2)} 人`,
   maxLevel: 5,
   cost: (lv) => ({
@@ -44,6 +47,7 @@ export const KITCHEN: FacilityDef = {
   id: 'kitchen',
   name: '厨房',
   icon: '🍳',
+  sprite: 'ui/ui_facility_kitchen.png',
   describe: (lv) => {
     const cfg = menuConfig(lv);
     const req = cfg.required.length > 0 ? ` · 需覆盖：${cfg.required.length} 类` : ' · 无结构要求';
@@ -63,6 +67,7 @@ export const DORM: FacilityDef = {
   id: 'dorm',
   name: '宿舍',
   icon: '🛏️',
+  sprite: 'ui/ui_facility_dorm.png',
   describe: (lv) =>
     `团灭休整 -${Math.min(50, lv * 10)}%${lv >= 3 ? ' · 欠薪不掉忠诚' : ''}`,
   maxLevel: 5,

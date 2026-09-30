@@ -1,5 +1,6 @@
 ﻿import { Panel } from './Panel';
 import { useGameStore } from '../store/gameStore';
+import { GameIcon } from './GameIcon';
 import { MONSTERS, MAP_DEFS } from '../data/monsters';
 import { MONSTER_SPRITES } from '../data/sprites';
 import {
@@ -65,7 +66,11 @@ export function CodexPanel() {
                 title={a.desc}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base leading-none">{done ? a.icon : '🔒'}</span>
+                  {done ? (
+                    <GameIcon sprite={a.sprite} fallback={a.icon} size={18} />
+                  ) : (
+                    <span className="text-base leading-none">🔒</span>
+                  )}
                   <span className={`font-bold ${done ? 'text-[#f0d78c]' : 'text-[#a89880]'}`}>{a.name}</span>
                 </div>
                 <div className="mt-1 text-[10px] text-[#a89880]">{a.desc}</div>

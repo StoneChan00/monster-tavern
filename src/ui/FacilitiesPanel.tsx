@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Panel } from './Panel';
 import { useGameStore } from '../store/gameStore';
+import { GameIcon } from './GameIcon';
 import { FACILITIES, type FacilityDef } from '../data/upgrades';
 import { MATERIALS } from '../data/materials';
 
@@ -40,8 +41,8 @@ function FacilityCard({ facility }: { facility: FacilityDef }) {
   return (
     <div className="border-2 border-[#3a2d1e] bg-[#1f1812] p-2 text-xs">
       <div className="flex items-center justify-between">
-        <span className="font-bold">
-          {facility.icon} {facility.name}
+        <span className="flex items-center gap-1 font-bold">
+          <GameIcon sprite={facility.sprite} fallback={facility.icon} size={16} /> {facility.name}
         </span>
         <span className="font-bold text-[#f0d78c]">
           Lv.{lv}

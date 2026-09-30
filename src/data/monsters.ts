@@ -553,6 +553,8 @@ export interface MapDef {
   floorSprites: string[];
   /** PixiJS tint 主题色（叠加在地板贴图上做主题差异） */
   floorTint: number;
+  /** 像素贴图（public/sprites/items/ 下相对路径） */
+  sprite?: string;
 }
 
 /**
@@ -561,42 +563,42 @@ export interface MapDef {
  */
 export const MAP_DEFS: MapDef[] = [
   {
-    id: 'map_1', number: 1, name: '苔藓洞窟', icon: '🕳️',
+    id: 'map_1', number: 1, name: '苔藓洞窟', icon: '🕳️', sprite: 'items/map_1.png',
     monsterPool: ['slime', 'bat', 'mushroom', 'big_slime', 'venom_bat', 'rock_crab', 'spore_mushroom', 'moss_wolf', 'cave_lizard', 'muck_slug'],
     elitePool: ['slime_king', 'bat_lord', 'crab_king', 'wolf_alpha'],
     firstClearReputation: 5,
     floorSprites: ['floor_mossy_1.png', 'floor_mossy_2.png', 'floor_mossy_3.png'], floorTint: 0xffffff,
   },
   {
-    id: 'map_2', number: 2, name: '秘银矿道', icon: '⛏️',
+    id: 'map_2', number: 2, name: '秘银矿道', icon: '⛏️', sprite: 'items/map_2.png',
     monsterPool: ['glow_jelly', 'stone_golem', 'shadow_spider', 'iron_beetle', 'moss_wolf', 'cave_lizard', 'rock_crab', 'faerie'],
     elitePool: ['golem_guard', 'weaver_queen'],
     firstClearReputation: 20,
     floorSprites: ['floor_mine_1.png', 'floor_mine_2.png', 'floor_mine_3.png'], floorTint: 0xffffff,
   },
   {
-    id: 'map_3', number: 3, name: '骸骨墓穴', icon: '💀',
+    id: 'map_3', number: 3, name: '骸骨墓穴', icon: '💀', sprite: 'items/map_3.png',
     monsterPool: ['skeleton', 'man_eater', 'shadow_spider', 'iron_beetle', 'spore_mushroom', 'mummy'],
     elitePool: ['skeleton_captain'],
     firstClearReputation: 30,
     floorSprites: ['floor_crypt_1.png', 'floor_crypt_2.png', 'floor_crypt_3.png'], floorTint: 0xffffff,
   },
   {
-    id: 'map_4', number: 4, name: '熔岩裂隙', icon: '🔥',
+    id: 'map_4', number: 4, name: '熔岩裂隙', icon: '🔥', sprite: 'items/map_4.png',
     monsterPool: ['acid_slime', 'cave_troll', 'wraith', 'basilisk', 'shadow_hunter', 'abyss_tentacle', 'obsidian_golem', 'hellhound'],
     elitePool: ['troll_warlord', 'wraith_lord', 'nightmare'],
     firstClearReputation: 42,
     floorSprites: ['floor_lava_1.png', 'floor_lava_2.png', 'floor_lava_3.png'], floorTint: 0xffffff,
   },
   {
-    id: 'map_5', number: 5, name: '水晶回廊', icon: '💠',
+    id: 'map_5', number: 5, name: '水晶回廊', icon: '💠', sprite: 'items/map_5.png',
     monsterPool: ['crystal_slime', 'crystal_bat', 'void_spider', 'ice_lizard', 'gem_golem', 'amethyst_beetle', 'wraith', 'yeti'],
     elitePool: ['crystal_mother', 'gem_titan', 'void_weaver', 'frost_basilisk', 'crystal_beetle_king'],
     firstClearReputation: 60,
     floorSprites: ['floor_crystal_1.png', 'floor_crystal_2.png', 'floor_crystal_3.png'], floorTint: 0xffffff,
   },
   {
-    id: 'map_6', number: 6, name: '虚空终焉', icon: '🌌',
+    id: 'map_6', number: 6, name: '虚空终焉', icon: '🌌', sprite: 'items/map_6.png',
     monsterPool: ['mind_flayer', 'void_wraith', 'purple_worm', 'nightmare_shade', 'void_heart_larva', 'void_imp'],
     elitePool: ['elder_flayer', 'void_reaper', 'crystal_dragon', 'shade_lord', 'the_void_heart'],
     firstClearReputation: 85,

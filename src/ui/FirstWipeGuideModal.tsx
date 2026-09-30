@@ -1,5 +1,6 @@
 import { useGameStore } from '../store/gameStore';
 import { BALANCE } from '../data/balance';
+import { GameIcon } from './GameIcon';
 import { MATERIALS } from '../data/materials';
 
 /**
@@ -14,9 +15,7 @@ export function FirstWipeGuideModal({ onGoRecruit }: { onGoRecruit: () => void }
 
   if (!open) return null;
 
-  const matParts = Object.entries(BALANCE.WIPE_SUBSIDY_MATERIALS)
-    .filter(([, n]) => (n ?? 0) > 0)
-    .map(([mid, n]) => `${MATERIALS[mid]?.icon ?? '📦'}${MATERIALS[mid]?.name ?? mid}×${n}`);
+  const matEntries = Object.entries(BALANCE.WIPE_SUBSIDY_MATERIALS).filter(([, n]) => (n ?? 0) > 0);
   const firstMember = rosterCount <= 1;
 
   return (
@@ -31,9 +30,14 @@ export function FirstWipeGuideModal({ onGoRecruit }: { onGoRecruit: () => void }
         </p>
         <div className="space-y-1 border-2 border-[#8a6a2a] bg-[#2b2118] p-3 text-center text-xs">
           <div className="font-bold text-[#f0d78c]">🆘 酒馆理事会紧急拨款</div>
-          <div className="text-[#f0e6d2]">
-            💰 金币 +{BALANCE.WIPE_SUBSIDY_GOLD}
-            {matParts.length > 0 ? ` · ${matParts.join(' · ')}` : ''}
+          <div className="flex flex-wrap items-center justify-center gap-1 text-[#f0e6d2]">
+            <span>💰 金币 +{BALANCE.WIPE_SUBSIDY_GOLD}</span>
+            {matEntries.map(([mid, n]) => (
+              <span key={mid} className="inline-flex items-center gap-0.5">
+                · <GameIcon sprite={MATERIALS[mid]?.sprite} fallback={MATERIALS[mid]?.icon ?? '📦'} size={12} />
+                {MATERIALS[mid]?.name ?? mid}×{n}
+              </span>
+            ))}
           </div>
         </div>
         <p className="mt-3 text-center text-xs leading-relaxed text-[#a89880]">

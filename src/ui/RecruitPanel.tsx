@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Panel } from './Panel';
 import { CharacterSprite } from './CharacterSprite';
+import { GameIcon } from './GameIcon';
+import { RaceBadge } from './RaceBadge';
 import { useGameStore } from '../store/gameStore';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
@@ -82,16 +84,23 @@ function VisitorCard({
         <span className="truncate font-bold" style={{ color: tier.color }}>
           {visitor.name}
         </span>
-        <span className="ml-auto text-[10px] text-[#a89880]">
+        <span className="ml-auto flex items-center gap-1 text-[10px] text-[#a89880]">
+          <RaceBadge raceId={visitor.race} size={11} />
           {RACES[visitor.race]?.name ?? '人类'} · {cls.name} ·{' '}
           <span style={{ color: tier.color }}>
             Lv.{visitor.level} {tier.label}
           </span>
         </span>
       </div>
-      <div className="mt-1.5 text-[11px] text-[#a89880]">
+      <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-[#a89880]">
         签约费：💰{visitor.costGold}
-        {visitor.costMaterial.count > 0 ? ` + ${mat?.icon ?? ''}${mat?.name ?? ''}×${visitor.costMaterial.count}` : ''}
+        {visitor.costMaterial.count > 0 ? (
+          <>
+            {' + '}
+            <GameIcon sprite={mat?.sprite} fallback={mat?.icon ?? '📦'} size={12} />
+            {mat?.name ?? ''}×{visitor.costMaterial.count}
+          </>
+        ) : null}
       </div>
       <button
         type="button"

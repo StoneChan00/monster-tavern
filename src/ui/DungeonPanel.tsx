@@ -3,6 +3,8 @@ import { Bar } from './Bar';
 import { BattleViewport } from './BattleViewport';
 import { MonsterSprite } from './SpriteIcon';
 import { CharacterSprite } from './CharacterSprite';
+import { GameIcon } from './GameIcon';
+import { RaceBadge } from './RaceBadge';
 import { useGameStore } from '../store/gameStore';
 import { BALANCE } from '../data/balance';
 import { CLASSES } from '../data/classes';
@@ -63,7 +65,12 @@ export function DungeonPanel() {
                 }`}
                 title={locked ? '尚未解锁（讨伐上一张图的精英）' : m.name}
               >
-                {locked ? '🔒' : m.icon} {MAP_LABEL[m.number - 1]}·{m.name}
+                {locked ? (
+                  '🔒'
+                ) : (
+                  <GameIcon sprite={m.sprite} fallback={m.icon} size={14} />
+                )}{' '}
+                {MAP_LABEL[m.number - 1]}·{m.name}
                 {cleared ? ' ✓' : ''}
               </button>
             );
@@ -96,7 +103,9 @@ export function DungeonPanel() {
       <Panel
         title={
           <span className="flex flex-wrap items-baseline gap-x-2">
-            {map.icon} {map.name}
+            <span className="inline-flex items-center gap-1">
+              <GameIcon sprite={map.sprite} fallback={map.icon} size={16} /> {map.name}
+            </span>
             <span className="text-[10px] font-normal text-[#a89880]">
               本图清波 {fmtNum(s.dungeon.waveCount)} · 累计 {fmtNum(s.meta.totalWavesCleared)} · 精英讨伐{' '}
               {s.meta.totalBossKills}
@@ -122,7 +131,6 @@ export function DungeonPanel() {
                 </div>
               ) : (
                 members.map((m) => {
-                  const cls = CLASSES[m.adv.classId];
                   const maxHp = getAdventurerStats(s, m.adv).hp;
                   const hp = Math.min(m.adv.hp, maxHp);
                   const dead = m.adv.hp <= 0;
@@ -132,7 +140,7 @@ export function DungeonPanel() {
                       className={`border-2 border-[#3a2d1e] bg-[#1f1812] p-1.5 ${dead ? 'opacity-40 grayscale' : ''}`}
                     >
                       <div className="flex items-center gap-1">
-                        <span>{cls.icon}</span>
+                        <CharacterSprite classId={m.adv.classId} size={16} />
                         <span className="truncate text-[11px]">{m.adv.name}</span>
                         <span className="ml-auto text-[10px] text-[#a89880]">Lv{m.adv.level}</span>
                       </div>
@@ -162,7 +170,12 @@ export function DungeonPanel() {
                       isElite ? 'border-[#8a3a2a] bg-[#2a1512]' : 'border-[#3a2d1e] bg-[#1f1812]'
                     } ${dead ? 'opacity-40 grayscale' : ''}`}
                   >
-                    <MonsterSprite monsterId={m.monsterId} fallback={def.icon} size={isElite ? 26 : 20} />
+                    <MonsterSprite
+                      monsterId={m.monsterId}
+                      elite={isElite}
+                      fallback={def.icon}
+                      size={isElite ? 26 : 20}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex justify-between">
                         <span className={isElite ? 'font-bold text-[#f0d78c]' : ''}>
@@ -260,7 +273,8 @@ function SlotContent({ slot, state }: { slot: number; state: GameState }) {
             <span className="truncate font-bold" style={{ color: levelTier(adv.level).color }}>
               {adv.name}
             </span>
-            <span className="ml-auto shrink-0 text-[10px] text-[#a89880]">
+            <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] text-[#a89880]">
+              <RaceBadge raceId={adv.race} size={11} />
               {RACES[adv.race]?.name ?? '人类'} · {CLASSES[adv.classId].name} ·{' '}
               <span style={{ color: levelTier(adv.level).color }}>Lv{adv.level}</span>
             </span>

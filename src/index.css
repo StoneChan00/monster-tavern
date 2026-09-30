@@ -1,6 +1,68 @@
 @import "tailwindcss";
 
-/* ===== 魔物酒馆 · 全局基调（Phase 0 占位样式，正式素材接入后替换）===== */
+/* ===== 魔物酒馆 · 全局基调 =====
+ * Design tokens 单一真值源（详见 docs/STYLE.md）：
+ *  - @theme 同时注册 CSS 变量与 Tailwind 工具类（bg-wood-800 / text-parchment / border-bark-600 …）
+ *  - 组件内历史遗留的任意值色（bg-[#1f1812] 等）与 token 等值，可渐进迁移
+ * 风格规范：16×16 像素网格 · 2px 粗轮廓 · 硬边框硬阴影 · 全直角 · 整数倍缩放
+ */
+@theme {
+  /* ── 木质背景梯度（深→浅）── */
+  --color-wood-950: #141009; /* 战斗画布底 */
+  --color-wood-900: #171008; /* 锁定/禁用底 */
+  --color-wood-850: #1a1410; /* 页面底 */
+  --color-wood-800: #1f1812; /* 卡片底 */
+  --color-wood-750: #241b13; /* 面板渐变下 */
+  --color-wood-700: #2b2118; /* 面板渐变上 */
+  --color-wood-600: #332818; /* 悬停底 */
+  --color-wood-500: #3a2d1e; /* 按钮底 / 卡片描边 */
+  --color-wood-400: #4a3a26; /* 按钮悬停底 */
+  /* ── 树皮描边 ── */
+  --color-bark-600: #5c4325; /* 面板描边 */
+  --color-bark-500: #8a6a2a; /* 可点击房间描边 */
+  /* ── 羊皮纸文字梯度 ── */
+  --color-parchment: #f0e6d2; /* 主文字 */
+  --color-parchment-dim: #a89880; /* 次级 */
+  --color-parchment-faint: #8a7a62; /* 三级 */
+  --color-parchment-mute: #6b5d48; /* 极淡 */
+  /* ── 金色点缀 ── */
+  --color-gold: #d9a441;
+  --color-gold-bright: #e8b455;
+  --color-gold-text: #f0d78c;
+  /* ── 熔火危险色 ── */
+  --color-ember: #7a2d22;
+  --color-ember-deep: #5c1f16;
+  --color-ember-bright: #8f372a;
+  --color-ember-text: #f0d5cf;
+  /* ── 硬阴影 ── */
+  --shadow-hard-lg: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  --shadow-hard-md: 3px 3px 0 rgba(0, 0, 0, 0.45);
+  --shadow-hard-sm: 1px 1px 0 rgba(0, 0, 0, 0.45);
+  /* ── 像素字体（12px 及整数倍下最锐利；emoji 自动回退系统字体）── */
+  --font-pixel:
+    "Fusion Pixel 12px", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+/* Fusion Pixel 12px（OFL-1.1，见 src/assets/fonts/LICENSE-OFL.txt）*/
+@font-face {
+  font-family: "Fusion Pixel 12px";
+  src: url("./assets/fonts/fusion-pixel-12px-proportional-latin.otf.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0020-007E, U+00A0-00FF, U+2010-2027, U+2030-205E;
+}
+@font-face {
+  font-family: "Fusion Pixel 12px";
+  src: url("./assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+3000-303F, U+4E00-9FFF, U+FF00-FFEF, U+2190-21FF, U+2500-25FF;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -12,9 +74,9 @@ body {
 }
 
 body {
-  background-color: #1a1410; /* 酒馆深木色 */
-  color: #f0e6d2; /* 羊皮纸暖白 */
-  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background-color: var(--color-wood-850);
+  color: var(--color-parchment);
+  font-family: var(--font-pixel);
 }
 
 * {
@@ -23,16 +85,16 @@ body {
 
 /* ── 像素风组件（硬边框 + 硬阴影 + 无圆角）── */
 .pixel-panel {
-  border: 2px solid #5c4325;
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
-  background: linear-gradient(180deg, #2b2118 0%, #241b13 100%);
+  border: 2px solid var(--color-bark-600);
+  box-shadow: var(--shadow-hard-lg);
+  background: linear-gradient(180deg, var(--color-wood-700) 0%, var(--color-wood-750) 100%);
 }
 
 .pixel-btn {
-  border: 2px solid #5c4325;
-  background: #3a2d1e;
-  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
-  color: #f0e6d2;
+  border: 2px solid var(--color-bark-600);
+  background: var(--color-wood-500);
+  box-shadow: var(--shadow-hard-md);
+  color: var(--color-parchment);
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
@@ -44,12 +106,12 @@ body {
 }
 
 .pixel-btn:hover:not(:disabled) {
-  background: #4a3a26;
+  background: var(--color-wood-400);
 }
 
 .pixel-btn:active:not(:disabled) {
   transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow-hard-sm);
 }
 
 .pixel-btn:disabled {
@@ -59,23 +121,23 @@ body {
 }
 
 .pixel-btn-primary {
-  background: #d9a441;
-  border-color: #8a6a2a;
-  color: #1a1410;
+  background: var(--color-gold);
+  border-color: var(--color-bark-500);
+  color: var(--color-wood-850);
 }
 
 .pixel-btn-primary:hover:not(:disabled) {
-  background: #e8b455;
+  background: var(--color-gold-bright);
 }
 
 .pixel-btn-danger {
-  background: #7a2d22;
-  border-color: #5c1f16;
-  color: #f0d5cf;
+  background: var(--color-ember);
+  border-color: var(--color-ember-deep);
+  color: var(--color-ember-text);
 }
 
 .pixel-btn-danger:hover:not(:disabled) {
-  background: #8f372a;
+  background: var(--color-ember-bright);
 }
 
 /* ── 动效 ── */
@@ -114,11 +176,11 @@ body {
 @keyframes guide-flash {
   0%,
   100% {
-    border-color: #3a2d1e;
+    border-color: var(--color-wood-500);
     box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
   }
   50% {
-    border-color: #d9a441;
+    border-color: var(--color-gold);
     box-shadow: 0 0 0 3px rgba(217, 164, 65, 0.3), 4px 4px 0 rgba(0, 0, 0, 0.45);
   }
 }
@@ -136,16 +198,16 @@ body {
 
 /* 下拉选择器（编队指派） */
 .pixel-select {
-  border: 2px solid #5c4325;
-  background: #1f1812;
-  color: #f0e6d2;
+  border: 2px solid var(--color-bark-600);
+  background: var(--color-wood-800);
+  color: var(--color-parchment);
   padding: 2px 4px;
   font-size: 11px;
   cursor: pointer;
 }
 
 .pixel-select:focus {
-  outline: 1px solid #d9a441;
+  outline: 1px solid var(--color-gold);
 }
 
 /* 像素精灵图（禁用平滑，保持锐利） */

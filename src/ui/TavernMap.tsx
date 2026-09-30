@@ -1,4 +1,5 @@
 import { Panel } from './Panel';
+import { GameIcon } from './GameIcon';
 import { useGameStore } from '../store/gameStore';
 import { fmtDuration, fmtNum } from '../utils/format';
 
@@ -53,6 +54,8 @@ export function TavernMap({
         <Room
           className="order-3 md:order-none md:row-span-2"
           icon="🛏️"
+          sprite="ui/ui_facility_dorm.png"
+          scene="furniture/scene_dorm.png"
           name="宿舍"
           clickable
           sub={`Lv.${s.tavern.dorm} · 团灭休整 -${Math.min(50, s.tavern.dorm * 10)}%`}
@@ -62,6 +65,8 @@ export function TavernMap({
         <Room
           className="order-1 md:order-none"
           icon="🛎️"
+          sprite="ui/ui_room_front.png"
+          scene="furniture/scene_front.png"
           name="前台"
           sub={`💰 ${fmtNum(s.player.gold)} · ⭐ ${s.player.reputation} 声望`}
           status={`🧑‍🤝‍🧑 在册 ${s.roster.length} 人`}
@@ -69,6 +74,8 @@ export function TavernMap({
         <Room
           className="order-4 md:order-none md:row-span-2"
           icon="🍳"
+          sprite="ui/ui_facility_kitchen.png"
+          scene="furniture/scene_kitchen.png"
           name="厨房"
           clickable
           sub={`Lv.${s.tavern.kitchen} · 菜单 ${menuDishes} 道 · 供给中 ${menuActive}`}
@@ -78,6 +85,8 @@ export function TavernMap({
         <Room
           className="order-2 md:order-none md:col-span-2"
           icon="🪑"
+          sprite="ui/ui_facility_lounge.png"
+          scene="furniture/scene_lounge.png"
           name="招待区"
           clickable
           sub={`Lv.${s.tavern.lounge} · 替补席 ${4 + s.tavern.lounge} 人`}
@@ -97,6 +106,9 @@ interface RoomProps {
   /** 布局类（order / span 由外层注入，移动端与桌面端排序不同） */
   className?: string;
   icon: string;
+  sprite?: string;
+  /** 房间场景贴图（public/sprites/furniture/ 32×32 合成图） */
+  scene?: string;
   name: string;
   /** 等级/常驻效果行 */
   sub: string;
@@ -106,8 +118,8 @@ interface RoomProps {
   onClick?: () => void;
 }
 
-/** 单个房间：像素风木地板 + 名称/等级/动态状态；可点击房间带「进入 ▸」与悬停反馈 */
-function Room({ className = '', icon, name, sub, status, clickable = false, onClick }: RoomProps) {
+/** 单个房间：家具场景贴图 + 名称/等级/动态状态；可点击房间带「进入 ▸」与悬停反馈 */
+function Room({ className = '', icon, sprite, scene, name, sub, status, clickable = false, onClick }: RoomProps) {
   const base = `tavern-plank relative border-2 p-2 text-left ${
     clickable
       ? 'cursor-pointer border-[#8a6a2a] bg-[#2b2118] transition-colors hover:border-[#d9a441] hover:bg-[#332818]'
@@ -116,12 +128,26 @@ function Room({ className = '', icon, name, sub, status, clickable = false, onCl
   const inner = (
     <>
       <div className="flex items-center gap-1.5">
-        <span className="text-base leading-none">{icon}</span>
+        <GameIcon sprite={sprite} fallback={icon} size={18} />
         <span className="text-xs font-bold text-[#f0e6d2]">{name}</span>
         {clickable ? <span className="ml-auto text-[10px] text-[#d9a441]">进入 ▸</span> : null}
       </div>
-      <div className="mt-1 text-[10px] text-[#a89880]">{sub}</div>
-      {status ? <div className="mt-0.5 text-[10px] text-[#8a7a62]">{status}</div> : null}
+      <div className="mt-1 flex items-start gap-2">
+        {scene ? (
+          <img
+            src={`${import.meta.env.BASE_URL}sprites/${scene}`}
+            alt={name}
+            width={32}
+            height={32}
+            draggable={false}
+            className="pixel-img shrink-0"
+          />
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] text-[#a89880]">{sub}</div>
+          {status ? <div className="mt-0.5 text-[10px] text-[#8a7a62]">{status}</div> : null}
+        </div>
+      </div>
     </>
   );
 

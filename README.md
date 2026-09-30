@@ -28,6 +28,9 @@ pnpm build    # 产物输出到 dist/
 
 ## 素材致谢
 
-- [Kenney](https://kenney.nl)（Tiny Dungeon 等，CC0）
+- [Kenney](https://kenney.nl)（Tiny Dungeon / Tiny Town / Roguelike Indoor 等，CC0）
 - [Tiny Creatures by Clint Bellanger](https://opengameart.org/content/tiny-creatures)（CC0，经 Kenney 授权）
+- [16x16 Food](https://opengameart.org/content/16x16-food)（Hamletum 调色板，CC0）
+- [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL-1.1）
 - 灵感：迷宫饭 / D&D
+- 完整风格规范与产出管线见 [docs/STYLE.md](docs/STYLE.md)

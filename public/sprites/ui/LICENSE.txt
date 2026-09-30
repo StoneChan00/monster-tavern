@@ -1,0 +1,2 @@
+本目录为程序化自绘 UI 图标（货币/页签/设施/房间，生成管线见 assets/tools/icon-grids.cjs）：
+项目原创，许同项目整体许可。风格规范见 docs/STYLE.md。

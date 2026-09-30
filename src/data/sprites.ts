@@ -1,5 +1,6 @@
-import { MONSTERS } from './monsters';
+import { MAP_DEFS, MONSTERS } from './monsters';
 import { CLASSES } from './classes';
+import type { MonsterId } from '../engine/types';
 
 /**
  * 像素精灵映射（全部 CC0）。素材原始包与切片流程见 assets/README.md。
@@ -93,3 +94,12 @@ export const CLASS_SPRITES: Record<keyof typeof CLASSES, string> = {
   ranger: 'ranger.png',
   bard: 'bard.png',
 };
+
+/**
+ * 精英变体贴图（gen-elites.cjs 程序化生成：金框轮廓 + 提饱和 + 顶部王冠）。
+ * 精英 = 原生 BOSS 魔物（elitePool: MonsterId[]），文件名 = elite_<魔物id>.png；
+ * 从 MAP_DEFS 派生，新增精英自动纳入约定。
+ */
+export const ELITE_SPRITES: Partial<Record<MonsterId, string>> = Object.fromEntries(
+  [...new Set(MAP_DEFS.flatMap((m) => m.elitePool))].map((id) => [id, `elite_${id}.png`]),
+);

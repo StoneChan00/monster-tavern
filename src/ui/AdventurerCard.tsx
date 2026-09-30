@@ -1,6 +1,7 @@
 import { Panel } from './Panel';
 import { Bar } from './Bar';
 import { CharacterSprite } from './CharacterSprite';
+import { RaceBadge } from './RaceBadge';
 import { useGameStore } from '../store/gameStore';
 import { BALANCE, levelUpCost, wageOfLevel } from '../data/balance';
 import { CLASSES } from '../data/classes';
@@ -55,7 +56,8 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
     >
       <div className="space-y-2 text-xs">
         <div className="flex items-baseline justify-between">
-          <span className="text-[#a89880]">
+          <span className="flex items-center gap-1 text-[#a89880]">
+            <RaceBadge raceId={adv.race} />
             {RACES[adv.race]?.name ?? '人类'} · {cls.name} · {cls.role.split(' / ')[0]}
             {inParty ? (
               <span className="font-bold text-[#8fbf6a]"> · ⚔️ 队伍中{rowLabel ? `（${rowLabel}）` : ''}</span>

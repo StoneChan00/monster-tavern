@@ -1,5 +1,6 @@
 import { Panel } from './Panel';
 import { useGameStore } from '../store/gameStore';
+import { GameIcon } from './GameIcon';
 import { MATERIALS } from '../data/materials';
 import { RECIPES } from '../data/recipes';
 import {
@@ -62,7 +63,7 @@ export function InventoryBar() {
               }`}
               title={tips}
             >
-              <span className="text-sm leading-none">{m.icon}</span>
+              <GameIcon sprite={m.sprite} fallback={m.icon} size={16} />
               <span className={elite ? 'text-[#a5d47a]' : 'text-[#a89880]'}>{m.name}</span>
               <span className="font-bold tabular-nums">×{s.inventory[m.id] ?? 0}</span>
               {burn > 0 ? (

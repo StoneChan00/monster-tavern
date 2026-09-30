@@ -10,6 +10,8 @@ export interface RaceDef {
   name: string;
   /** 属性修正（加在职业基础值上，乘区之前） */
   statMods: Partial<BaseStats>;
+  /** 像素徽章贴图（public/sprites/items/ 下相对路径） */
+  sprite?: string;
   /** 名字池（种族风味命名） */
   namePool: string[];
   /** 到访权重 */
@@ -22,6 +24,7 @@ export const HUMAN: RaceDef = {
   statMods: { hp: 6, atk: 1, def: 1, spd: 1 },
   namePool: ['罗兰', '艾登', '玛雅', '卡尔文', '莉娅', '托马斯'],
   weight: 22,
+  sprite: 'items/race_human.png',
 };
 
 export const ELF: RaceDef = {
@@ -30,6 +33,7 @@ export const ELF: RaceDef = {
   statMods: { spd: 4, def: 1 },
   namePool: ['艾伦德', '莉雅温', '希尔文', '塔玛瑞尔', '伊苏尔达', '芬瑞斯'],
   weight: 12,
+  sprite: 'items/race_elf.png',
 };
 
 export const DWARF: RaceDef = {
@@ -38,6 +42,7 @@ export const DWARF: RaceDef = {
   statMods: { hp: 16, def: 3 },
   namePool: ['索林', '达格娜', '铁须巴林', '岩锤葛姆', '布洛玛', '铜心赫尔嘉'],
   weight: 12,
+  sprite: 'items/race_dwarf.png',
 };
 
 export const HALFLING: RaceDef = {
@@ -46,6 +51,7 @@ export const HALFLING: RaceDef = {
   statMods: { spd: 3, atk: 1 },
   namePool: ['皮聘', '罗索', '樱草', '邦果', '黛西', '梅里多克'],
   weight: 11,
+  sprite: 'items/race_halfling.png',
 };
 
 export const GNOME: RaceDef = {
@@ -54,6 +60,7 @@ export const GNOME: RaceDef = {
   statMods: { atk: 2, spd: 1 },
   namePool: ['菲兹维克', '齐格蒙', '妮莎贝儿', '帕丁诺', '沃佐克', '艾尔米什'],
   weight: 11,
+  sprite: 'items/race_gnome.png',
 };
 
 export const HALF_ELF: RaceDef = {
@@ -62,6 +69,7 @@ export const HALF_ELF: RaceDef = {
   statMods: { atk: 2, hp: 6 },
   namePool: ['亚瑟兰', '薇拉妮', '卡莱尔', '塞西莉亚', '奥兰多', '米娅拉'],
   weight: 12,
+  sprite: 'items/race_half_elf.png',
 };
 
 export const HALF_ORC: RaceDef = {
@@ -70,6 +78,7 @@ export const HALF_ORC: RaceDef = {
   statMods: { atk: 3, hp: 10 },
   namePool: ['格罗什', '玛格妲', '卡尔加', '布拉卡', '雷加', '乌鲁克'],
   weight: 10,
+  sprite: 'items/race_half_orc.png',
 };
 
 export const TIEFLING: RaceDef = {
@@ -78,6 +87,7 @@ export const TIEFLING: RaceDef = {
   statMods: { atk: 3, def: 1 },
   namePool: ['墨魇', '卡莉丝塔', '瓦罗斯', '妮薇丝', '萨尔梅克', '莉莉丝安'],
   weight: 5,
+  sprite: 'items/race_tiefling.png',
 };
 
 export const DRAGONBORN: RaceDef = {
@@ -86,6 +96,7 @@ export const DRAGONBORN: RaceDef = {
   statMods: { atk: 2, hp: 14 },
   namePool: ['巴哈鲁斯', '拉希安', '珊德拉', '卡尔塔克斯', '威瑞丝', '顿达金'],
   weight: 5,
+  sprite: 'items/race_dragonborn.png',
 };
 
 export const RACES: Record<RaceId, RaceDef> = {
