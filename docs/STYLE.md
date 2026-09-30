@@ -67,6 +67,8 @@ HP 绿 `#7cb342` · 饱食绿 `#a5d47a` · 魔物 HP 红 `#c0392b` · 经验紫 
 | `public/sprites/items/` | 菜谱 24 / 材料 29 / 地图 6 / 成就 17 / 种族徽章 9 | oga-16x16-food（CC0，描边加深再加工）+ 程序化自绘（原创） |
 | `public/sprites/ui/` | 货币/页签/设施/房间图标/家具元素 | 程序化自绘（原创） |
 | `public/sprites/furniture/` | 酒馆房间场景 32×32 ×4 | 程序化合成（原创，gen-furniture.cjs） |
+| `public/sprites/dressing/` | 战斗景深装饰：16×24 竖件 ×11 + 16×8 前景带 ×6 | 程序化自绘（原创，gen-dressing.cjs） |
+| `public/sprites/backdrops/` | 战斗背景墙带 256×32 ×6 | Qwen-Image 生成 + 调色板量化（gen-backdrops.cjs） |
 | `src/assets/fonts/` | Fusion Pixel 12px（latin + zh_hans） | OFL-1.1，见同目录 LICENSE |
 
 原始素材包（勿直接引用）：`assets/packs/`。归属惯例：每个 `public/sprites/*` 目录带 `LICENSE.txt`。
@@ -79,12 +81,14 @@ HP 绿 `#7cb342` · 饱食绿 `#a5d47a` · 魔物 HP 红 `#c0392b` · 经验紫 
 
 ## 5. 产出管线（新素材必走）
 
-1. **来源三选一**：CC0 素材包切片（`assets/tools/export3.cjs`）→ 重着色/补描边（`assets/tools/make-furniture.cjs`）→ 程序化自绘（`assets/tools/gen-icons.cjs`）
+1. **来源四选一**：CC0 素材包切片（`export3.cjs`）→ 程序化自绘（`gen-icons.cjs` / `gen-dressing.cjs` / `gen-furniture.cjs` / `gen-elites.cjs`）→ AI 背景板（Qwen-Image 生成 + `gen-backdrops.cjs` 量化，仅限 §6 修订案范围）
 2. **输出** 16×16 PNG 至 `public/sprites/<类目>/`，文件名小写下划线语义命名
 3. **映射** 写入对应 `src/data/` 模块（类型强制，漏配编译报错）
 4. **目检**：`node assets/tools/dump.cjs <文件>` ASCII 渲染逐张检查（透明 `.` 暗轮廓 `#` 暗色 `x` 红R 绿G 蓝B 黄Y 中性o）
 5. **测试**：`pnpm test`（贴图完整性）+ `pnpm build`
-6. **AI 生成图政策**（PROPOSAL §4.4）：仅限内部占位与灵感探索，不入正式素材
+6. **AI 生成图政策**（PROPOSAL §4.4 修订案，项目所有者 2026-09-30 批准）：
+   - **允许**：战斗背景墙带（backdrops/）——Qwen-Image（Apache-2.0，本地 NPU）生成，**必须**经 gen-backdrops.cjs 量化到本调色板后使用
+   - **仍然禁止**：精灵/图标/道具类素材直接使用 AI 图（网格精度与轮廓语言不兼容）；AI 图不得绕过量化工序上屏
 
 ## 6. 已知风格风险
 

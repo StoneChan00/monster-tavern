@@ -555,6 +555,12 @@ export interface MapDef {
   floorTint: number;
   /** 像素贴图（public/sprites/items/ 下相对路径） */
   sprite?: string;
+  /** 背景墙带贴图（public/sprites/ 下相对路径，横向镜像平铺） */
+  backdrop?: string;
+  /** 竖向装饰（public/sprites/dressing/ 下相对路径，位置哈希散布） */
+  dressingProps?: string[];
+  /** 前景带贴图（public/sprites/dressing/ 下相对路径，视口底部遮挡） */
+  foreground?: string;
 }
 
 /**
@@ -568,6 +574,9 @@ export const MAP_DEFS: MapDef[] = [
     elitePool: ['slime_king', 'bat_lord', 'crab_king', 'wolf_alpha'],
     firstClearReputation: 5,
     floorSprites: ['floor_mossy_1.png', 'floor_mossy_2.png', 'floor_mossy_3.png'], floorTint: 0xffffff,
+    backdrop: 'backdrops/backdrop_map_1.png',
+    dressingProps: ['dressing/stalagmite_mossy.png', 'dressing/pillar_moss.png'],
+    foreground: 'dressing/fg_rock_mossy.png',
   },
   {
     id: 'map_2', number: 2, name: '秘银矿道', icon: '⛏️', sprite: 'items/map_2.png',
@@ -575,6 +584,9 @@ export const MAP_DEFS: MapDef[] = [
     elitePool: ['golem_guard', 'weaver_queen'],
     firstClearReputation: 20,
     floorSprites: ['floor_mine_1.png', 'floor_mine_2.png', 'floor_mine_3.png'], floorTint: 0xffffff,
+    backdrop: 'backdrops/backdrop_map_2.png',
+    dressingProps: ['dressing/pillar_timber.png', 'dressing/torch.png'],
+    foreground: 'dressing/fg_rock_timber.png',
   },
   {
     id: 'map_3', number: 3, name: '骸骨墓穴', icon: '💀', sprite: 'items/map_3.png',
@@ -582,6 +594,9 @@ export const MAP_DEFS: MapDef[] = [
     elitePool: ['skeleton_captain'],
     firstClearReputation: 30,
     floorSprites: ['floor_crypt_1.png', 'floor_crypt_2.png', 'floor_crypt_3.png'], floorTint: 0xffffff,
+    backdrop: 'backdrops/backdrop_map_3.png',
+    dressingProps: ['dressing/tombstone.png', 'dressing/bone_pile.png'],
+    foreground: 'dressing/fg_rock_crypt.png',
   },
   {
     id: 'map_4', number: 4, name: '熔岩裂隙', icon: '🔥', sprite: 'items/map_4.png',
@@ -589,6 +604,9 @@ export const MAP_DEFS: MapDef[] = [
     elitePool: ['troll_warlord', 'wraith_lord', 'nightmare'],
     firstClearReputation: 42,
     floorSprites: ['floor_lava_1.png', 'floor_lava_2.png', 'floor_lava_3.png'], floorTint: 0xffffff,
+    backdrop: 'backdrops/backdrop_map_4.png',
+    dressingProps: ['dressing/stalagmite_ember.png', 'dressing/torch.png'],
+    foreground: 'dressing/fg_rock_ember.png',
   },
   {
     id: 'map_5', number: 5, name: '水晶回廊', icon: '💠', sprite: 'items/map_5.png',
@@ -596,6 +614,9 @@ export const MAP_DEFS: MapDef[] = [
     elitePool: ['crystal_mother', 'gem_titan', 'void_weaver', 'frost_basilisk', 'crystal_beetle_king'],
     firstClearReputation: 60,
     floorSprites: ['floor_crystal_1.png', 'floor_crystal_2.png', 'floor_crystal_3.png'], floorTint: 0xffffff,
+    backdrop: 'backdrops/backdrop_map_5.png',
+    dressingProps: ['dressing/crystal_cluster.png', 'dressing/pillar_crystal.png'],
+    foreground: 'dressing/fg_rock_crystal.png',
   },
   {
     id: 'map_6', number: 6, name: '虚空终焉', icon: '🌌', sprite: 'items/map_6.png',
@@ -603,6 +624,9 @@ export const MAP_DEFS: MapDef[] = [
     elitePool: ['elder_flayer', 'void_reaper', 'crystal_dragon', 'shade_lord', 'the_void_heart'],
     firstClearReputation: 85,
     floorSprites: ['floor_void_1.png', 'floor_void_2.png', 'floor_void_3.png'], floorTint: 0xffffff,
+    backdrop: 'backdrops/backdrop_map_6.png',
+    dressingProps: ['dressing/monolith.png', 'dressing/crystal_cluster_void.png'],
+    foreground: 'dressing/fg_rock_void.png',
   },
 ];
 

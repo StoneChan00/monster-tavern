@@ -1,0 +1,3 @@
+本目录为战斗视口景深装饰（16×24 竖向道具 + 16×8 前景带）：
+assets/tools/gen-dressing.cjs 程序化生成，项目原创，许同项目整体许可。
+风格规范见 docs/STYLE.md。

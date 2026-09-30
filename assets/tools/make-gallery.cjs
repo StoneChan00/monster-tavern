@@ -35,6 +35,10 @@ const pngs = (dir) =>
     .filter((f) => f.endsWith('.png'))
     .sort();
 
+function rawPngs(dir) {
+  return fs.existsSync(path.join(SPRITES, dir)) ? pngs(dir) : [];
+}
+
 const stem = (f) => f.replace(/\.png$/, '');
 
 function card(dir, file, scale) {
@@ -44,11 +48,19 @@ function card(dir, file, scale) {
   return `<div class="card"><img src="sprites/${dir}/${file}" style="width:${16 * scale}px;height:${16 * scale}px" loading="lazy"><div class="lbl">${isElite && name ? `👑 ${name}` : name || id}</div><div class="sub">${id}</div></div>`;
 }
 
-function section(title, dir, files, scale = 3) {
+function section(title, dir, files, scale = 3, rawW = null) {
   if (!files.length) return '';
-  return `<h2>${title} <span class="cnt">${files.length}</span></h2><div class="grid">${files
-    .map((f) => card(dir, f, scale))
-    .join('')}</div>`;
+  const cards = files
+    .map((f) => {
+      if (rawW) {
+        const id = stem(f);
+        const name = NAMES[id.replace(/^elite_/, '')] ?? '';
+        return `<div class="card" style="width:auto"><img src="sprites/${dir}/${f}" style="width:${rawW}px;image-rendering:pixelated" loading="lazy"><div class="lbl">${name || id}</div><div class="sub">${id}</div></div>`;
+      }
+      return card(dir, f, scale);
+    })
+    .join('');
+  return `<h2>${title} <span class="cnt">${files.length}</span></h2><div class="grid">${cards}</div>`;
 }
 
 const monsters = pngs('monsters');
@@ -92,6 +104,8 @@ ${section('成就图标', 'items', items.filter((f) => f.startsWith('ach_')))}
 ${section('种族徽章', 'items', items.filter((f) => f.startsWith('race_')))}
 ${section('UI 图标（货币/页签/设施/房间/家具元素）', 'ui', ui)}
 ${section('酒馆房间场景（32×32 原生）', 'furniture', pngs('furniture'), 2)}
+${section('战斗背景墙带（AI 生成 + 调色板量化，256×32）', 'backdrops', rawPngs('backdrops'), 2, 512)}
+${section('战斗装饰件（16×24 竖件 + 16×8 前景带）', 'dressing', rawPngs('dressing'))}
 </body>
 </html>`;
 

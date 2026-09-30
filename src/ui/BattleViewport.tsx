@@ -18,6 +18,10 @@ const PARTY_X = 64;
 const MONSTER_X_OFFSET = 74;
 /** 地板格：16px 贴图 × 2 倍缩放 */
 const FLOOR_CELL = 32;
+/** 背景墙带高度（显示像素，32 逻辑 px × 2） */
+const BACKDROP_BAND_H = 64;
+/** 前景带高度（显示像素，8 逻辑 px × 2） */
+const FG_BAND_H = 16;
 /** 与 index.css 的 --font-pixel 保持一致（emoji 经系统回退渲染） */
 const PIXEL_FONT = '"Fusion Pixel 12px", "Segoe UI", "PingFang SC", sans-serif';
 const MAX_QUEUE = 12; // 超过则丢弃旧事件（离线积压场景）
@@ -58,10 +62,18 @@ export function BattleViewport() {
     const textureCache = new Map<MonsterId, Texture>();
     const classTextureCache = new Map<ClassId, Texture>();
     const eliteTextureCache = new Map<string, Texture>();
-    /** 变体混铺地板层（Container of Sprite，位置哈希选变体） */
+    /** 景深素材（按相对路径索引） */
+    const backdropTextures = new Map<string, Texture>();
+    const dressingTextures = new Map<string, Texture>();
+    const fgTextures = new Map<string, Texture>();
+    /** 场景分层：背景带 / 地板 / 装饰 / 压暗 / 单位 / 前景带 */
+    const backdropLayer = new Container();
+    const propsLayer = new Container();
+    const unitLayer = new Container();
+    const fgLayer = new Container();
     let floorLayer: Container | null = null;
     let dimLayer: Graphics | null = null;
-    /** 当前地板签名（切图/缩放时重建） */
+    /** 当前场景签名（切图/缩放时重建） */
     let floorSignature = '';
     const partyUnits = new Map<string, Unit>();
     const monsterUnits = new Map<number, Unit>();
@@ -153,7 +165,7 @@ export function BattleViewport() {
         const x = PARTY_X + rowXOffset(m.slot);
         root.position.set(x, y);
         root.alpha = m.adv.hp <= 0 ? 0.35 : 1;
-        app.stage.addChild(root);
+        unitLayer.addChild(root);
         partyUnits.set(m.adv.id, { root, baseX: x, baseY: y });
       });
     };
@@ -170,7 +182,7 @@ export function BattleViewport() {
         root.addChild(makeIcon(m.monsterId, undefined, m.elite));
         const y = spreadY(i, list.length);
         root.position.set(mx, y);
-        app.stage.addChild(root);
+        unitLayer.addChild(root);
         monsterUnits.set(m.uid, { root, baseX: mx, baseY: y });
         if (animate) {
           root.x = mx + 46;
@@ -323,25 +335,33 @@ export function BattleViewport() {
       const w = Math.max(240, host.clientWidth);
       app.renderer.resize(w, VIEW_H);
       if (dimLayer) {
-        dimLayer.clear().rect(0, 0, w, VIEW_H).fill({ color: 0x141009, alpha: 0.4 });
+        dimLayer.clear().rect(0, BACKDROP_BAND_H, w, VIEW_H - BACKDROP_BAND_H).fill({ color: 0x141009, alpha: 0.4 });
       }
       relayout();
     });
 
     void (async () => {
-      // 预载像素贴图（CC0 Kenney），失败则回退 emoji。
+      // 预载像素贴图（CC0 Kenney + 程序化生成），失败则回退 emoji。
       // URL 一律以 BASE_URL 前缀（GitHub Pages 子路径部署）
       const spriteUrl = (kind: 'monsters' | 'classes' | 'tiles', file: string) =>
         `${import.meta.env.BASE_URL}sprites/${kind}/${file}`;
+      /** 相对路径变体（backdrops/…、dressing/…） */
+      const spriteRelUrl = (rel: string) => `${import.meta.env.BASE_URL}sprites/${rel}`;
       const monsterEntries = Object.entries(MONSTER_SPRITES);
       const classEntries = Object.entries(CLASS_SPRITES);
       const eliteEntries = Object.entries(ELITE_SPRITES).filter((e): e is [string, string] => !!e[1]);
+      const backdropFiles = MAP_DEFS.map((m) => m.backdrop).filter((f): f is string => !!f);
+      const dressingFiles = [...new Set(MAP_DEFS.flatMap((m) => m.dressingProps ?? []))];
+      const fgFiles = MAP_DEFS.map((m) => m.foreground).filter((f): f is string => !!f);
       try {
         const urls = [
           ...monsterEntries.map(([, file]) => spriteUrl('monsters', file)),
           ...classEntries.map(([, file]) => spriteUrl('classes', file)),
           ...eliteEntries.map(([, file]) => spriteUrl('monsters', file)),
           ...FLOOR_SPRITE_FILES.map((file) => spriteUrl('tiles', file)),
+          ...backdropFiles.map(spriteRelUrl),
+          ...dressingFiles.map(spriteRelUrl),
+          ...fgFiles.map(spriteRelUrl),
         ];
         const textures = await Assets.load(urls);
         for (const [id, file] of monsterEntries) {
@@ -363,6 +383,27 @@ export function BattleViewport() {
           if (tex) {
             tex.source.scaleMode = 'nearest';
             classTextureCache.set(id as ClassId, tex);
+          }
+        }
+        for (const rel of backdropFiles) {
+          const tex = textures[spriteRelUrl(rel)];
+          if (tex) {
+            tex.source.scaleMode = 'nearest';
+            backdropTextures.set(rel, tex);
+          }
+        }
+        for (const rel of dressingFiles) {
+          const tex = textures[spriteRelUrl(rel)];
+          if (tex) {
+            tex.source.scaleMode = 'nearest';
+            dressingTextures.set(rel, tex);
+          }
+        }
+        for (const rel of fgFiles) {
+          const tex = textures[spriteRelUrl(rel)];
+          if (tex) {
+            tex.source.scaleMode = 'nearest';
+            fgTextures.set(rel, tex);
           }
         }
         for (const file of FLOOR_SPRITE_FILES) {
@@ -395,52 +436,105 @@ export function BattleViewport() {
       host.appendChild(app.canvas);
       ro.observe(host);
 
-      // 地牢背景：按当前地图主题混铺地板变体 + tint + 压暗层（保可读性）。
+      // 场景纵深：背景墙带（镜像平铺）→ 地板（墙带下方起铺）→ 竖向装饰（哈希散布）→ 前景带。
       // 每格用位置哈希选变体（基底A 60% / 基底B 28% / 点缀 12%），稳定不闪烁。
-      const buildFloor = (state: GameState): void => {
+      const buildScene = (state: GameState): void => {
         const w = stageWidth();
         const sig = `${state.dungeon.activeMap}:${w}`;
         if (sig === floorSignature) return;
         floorSignature = sig;
+        const mapDef = MAPS[state.dungeon.mapId] ?? MAPS[`map_${state.dungeon.activeMap}`];
+
+        // ── 背景墙带：奇数块水平镜像 → 无缝平铺 ──
+        backdropLayer.removeChildren();
+        const bdTex = mapDef?.backdrop ? backdropTextures.get(mapDef.backdrop) : undefined;
+        if (bdTex) {
+          const tileW = bdTex.width * 2;
+          const tiles = Math.ceil(w / tileW) + 1;
+          for (let i = 0; i < tiles; i++) {
+            const sp = new Sprite(bdTex);
+            sp.scale.set(i % 2 === 0 ? 2 : -2, 2);
+            sp.position.set(i % 2 === 0 ? i * tileW : (i + 1) * tileW, 0);
+            backdropLayer.addChild(sp);
+          }
+        }
+
+        // ── 地板：从墙带下缘起铺 ──
         if (floorLayer) {
           floorLayer.destroy({ children: true });
           floorLayer = null;
         }
-        const mapDef = MAPS[state.dungeon.mapId] ?? MAPS[`map_${state.dungeon.activeMap}`];
         const textures = (mapDef?.floorSprites ?? [])
           .map((f) => floorTextures.get(f))
           .filter((t): t is Texture => t !== undefined);
-        if (textures.length === 0) return;
-        const layer = new Container();
-        const cols = Math.ceil(w / FLOOR_CELL) + 1;
-        const rows = Math.ceil(VIEW_H / FLOOR_CELL);
-        for (let y = 0; y < rows; y++) {
-          for (let x = 0; x < cols; x++) {
-            const h =
-              Math.abs((x * 73856093) ^ (y * 19349663) ^ (state.dungeon.activeMap * 83492791)) % 100;
-            const tex =
-              h < 60
-                ? textures[0]
-                : h < 88
-                  ? textures[Math.min(1, textures.length - 1)]
-                  : textures[textures.length - 1];
-            const sp = new Sprite(tex);
-            sp.position.set(x * FLOOR_CELL, y * FLOOR_CELL);
+        if (textures.length > 0) {
+          const layer = new Container();
+          const cols = Math.ceil(w / FLOOR_CELL) + 1;
+          const rows = Math.ceil((VIEW_H - BACKDROP_BAND_H) / FLOOR_CELL);
+          for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+              const h =
+                Math.abs((x * 73856093) ^ (y * 19349663) ^ (state.dungeon.activeMap * 83492791)) % 100;
+              const tex =
+                h < 60
+                  ? textures[0]
+                  : h < 88
+                    ? textures[Math.min(1, textures.length - 1)]
+                    : textures[textures.length - 1];
+              const sp = new Sprite(tex);
+              sp.position.set(x * FLOOR_CELL, BACKDROP_BAND_H + y * FLOOR_CELL);
+              sp.scale.set(2);
+              sp.tint = mapDef.floorTint;
+              layer.addChild(sp);
+            }
+          }
+          floorLayer = layer;
+          app.stage.addChildAt(layer, 1);
+        }
+
+        // ── 竖向装饰：隔列哈希，30% 概率立一件（脚踩第一行地板，身后是墙带） ──
+        propsLayer.removeChildren();
+        const props = (mapDef?.dressingProps ?? [])
+          .map((p) => dressingTextures.get(p))
+          .filter((t): t is Texture => t !== undefined);
+        if (props.length > 0) {
+          const cols = Math.ceil(w / FLOOR_CELL) + 1;
+          for (let x = 2; x < cols; x += 3) {
+            const h = Math.abs((x * 19349663) ^ (state.dungeon.activeMap * 83492791)) % 100;
+            if (h >= 30) continue;
+            const sp = new Sprite(props[h % props.length]);
             sp.scale.set(2);
-            sp.tint = mapDef.floorTint;
-            layer.addChild(sp);
+            sp.position.set(x * FLOOR_CELL, BACKDROP_BAND_H + 14);
+            propsLayer.addChild(sp);
           }
         }
-        floorLayer = layer;
-        app.stage.addChildAt(layer, 0);
+
+        // ── 前景带：视口底部遮挡（奇数块镜像） ──
+        fgLayer.removeChildren();
+        const fgTex = mapDef?.foreground ? fgTextures.get(mapDef.foreground) : undefined;
+        if (fgTex) {
+          const tileW = fgTex.width * 2;
+          const tiles = Math.ceil(w / tileW) + 1;
+          for (let i = 0; i < tiles; i++) {
+            const sp = new Sprite(fgTex);
+            sp.scale.set(i % 2 === 0 ? 2 : -2, 2);
+            sp.position.set(i % 2 === 0 ? i * tileW : (i + 1) * tileW, VIEW_H - FG_BAND_H);
+            fgLayer.addChild(sp);
+          }
+        }
       };
       const initW = Math.max(240, host.clientWidth);
-      dimLayer = new Graphics().rect(0, 0, initW, VIEW_H).fill({ color: 0x141009, alpha: 0.4 });
+      dimLayer = new Graphics().rect(0, BACKDROP_BAND_H, initW, VIEW_H - BACKDROP_BAND_H).fill({ color: 0x141009, alpha: 0.4 });
+      // z 序：背景 0 / 地板 1 / 装饰 2 / 压暗 3 / 单位 4 / 前景 5
+      app.stage.addChildAt(backdropLayer, 0);
+      app.stage.addChildAt(propsLayer, 2);
       app.stage.addChild(dimLayer);
+      app.stage.addChild(unitLayer);
+      app.stage.addChild(fgLayer);
 
       // 初始同步：跳过历史积压，从当前战斗状态直接开始
       const state0 = useGameStore.getState().state;
-      buildFloor(state0);
+      buildScene(state0);
       layoutParty(state0);
       buildMonsters(
         state0.dungeon.monsters
@@ -487,7 +581,7 @@ export function BattleViewport() {
 
         // 编队/存活同步（每帧，签名变更才重建）+ 地板主题同步
         layoutParty(state);
-        buildFloor(state);
+        buildScene(state);
       });
     })();
 

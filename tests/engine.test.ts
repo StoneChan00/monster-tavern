@@ -1254,4 +1254,15 @@ describe('图标贴图完整性', () => {
       expect(existsSync(join(root, r.sprite!)), `${r.id} -> ${r.sprite}`).toBe(true);
     }
   });
+
+  it('战斗场景景深贴图（背景带/装饰/前景带）全部存在', () => {
+    const missing: string[] = [];
+    for (const m of MAP_DEFS) {
+      for (const rel of [m.backdrop, ...(m.dressingProps ?? []), m.foreground]) {
+        if (rel && !existsSync(join(root, rel))) missing.push(`${m.id} -> ${rel}`);
+      }
+    }
+    expect(missing).toEqual([]);
+    expect(MAP_DEFS.every((m) => m.backdrop && m.foreground && (m.dressingProps?.length ?? 0) >= 2)).toBe(true);
+  });
 });

@@ -1,0 +1,4 @@
+本目录为战斗视口背景墙带（256×32 逻辑像素，BattleViewport 镜像平铺）：
+由 Qwen-Image（Apache-2.0，本地 NPU）生成 + assets/tools/gen-backdrops.cjs
+量化到游戏调色板（docs/STYLE.md §2）后处理产出。
+政策依据：PROPOSAL §4.4 AI 图修订案（项目所有者 2026-09-30 批准，仅限背景板用途）。
