@@ -5,5 +5,10 @@ coverage/
 .DS_Store
 .omo/
 
+# 本地环境变量（Firebase 云同步配置），只入库 .env.example
+.env
+.env.local
+.env.*.local
+
 # 素材原始 zip（解压后的内容已入库 assets/packs/）
 assets/packs/*.zip

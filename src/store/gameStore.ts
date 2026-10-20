@@ -14,6 +14,7 @@ import { getAdventurerStats, expToNext, levelTier } from '../engine/stats';
 import { isSlotUnlocked } from '../engine/party';
 import { deserialize, serialize } from '../save/migrate';
 import { localStorageAdapter, SAVE_KEY } from '../save/adapter';
+import { emitLocalSave } from '../save/bus';
 import { LEVEL_CAP } from '../engine/types';
 import type { AdventurerState, GameState, OfflineReport, RecipeId } from '../engine/types';
 
@@ -386,7 +387,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const s = get().state;
     s.meta.lastSavedAt = Date.now();
     try {
-      localStorageAdapter.save(serialize(s));
+      const raw = serialize(s);
+      localStorageAdapter.save(raw);
+      // 广播给云同步层（未接入时无订阅者，零开销）
+      emitLocalSave(raw);
     } catch {
       // 配额满等异常：静默失败。UI 的「导出存档」按钮是玩家的兜底手段
     }

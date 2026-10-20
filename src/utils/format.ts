@@ -32,3 +32,11 @@ export function fmtDuration(totalS: number): string {
 export function pct(x: number): string {
   return `${Math.round(x * 100)}%`;
 }
+
+/** 毫秒时间戳 → 本地「MM-DD HH:mm」，用于云同步时间展示 */
+export function fmtDateTime(ts: number): string {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '未知时间';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

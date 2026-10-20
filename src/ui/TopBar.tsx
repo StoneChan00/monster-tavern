@@ -2,6 +2,7 @@ import { useRef, type ChangeEvent } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { fmtNum } from '../utils/format';
 import { GameIcon } from './GameIcon';
+import { CloudBar } from './CloudBar';
 
 /** 顶栏：酒馆名 + 货币 + 存档操作 */
 export function TopBar() {
@@ -49,7 +50,8 @@ export function TopBar() {
         <GameIcon sprite="ui/ui_reputation.png" fallback="⭐" size={16} />
         <span className="font-bold text-[#e8c07d]">{fmtNum(reputation)}</span>
       </span>
-      <span className="ml-auto flex gap-2">
+      <span className="ml-auto flex flex-wrap items-center gap-2">
+        <CloudBar />
         <button type="button" className="pixel-btn" onClick={onExport}>
           📤 导出存档
         </button>

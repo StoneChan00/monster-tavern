@@ -12,6 +12,7 @@ import { InventoryBar } from './ui/InventoryBar';
 import { WelcomeBackModal } from './ui/WelcomeBackModal';
 import { FirstWipeGuideModal } from './ui/FirstWipeGuideModal';
 import { TavernMap } from './ui/TavernMap';
+import { CloudSyncModal } from './ui/CloudSyncModal';
 
 /** Tab 式主界面：地牢（地图+编队+战斗）/ 宿舍（名册）/ 厨房 / 酒馆（地图+招待区+设施+背包）/ 图鉴 */
 export function App() {
@@ -51,6 +52,7 @@ export function App() {
       </div>
       <WelcomeBackModal />
       <FirstWipeGuideModal onGoRecruit={() => setTab('tavern')} />
+      <CloudSyncModal />
     </div>
   );
 }
