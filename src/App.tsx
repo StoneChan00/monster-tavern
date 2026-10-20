@@ -28,7 +28,12 @@ export function App() {
           {tab === 'kitchen' && <KitchenPanel />}
           {tab === 'tavern' && (
             <div className="space-y-3">
-              <TavernMap onOpenKitchen={() => setTab('kitchen')} onOpenDorm={() => setTab('dorm')} />
+              <TavernMap
+                onOpenKitchen={() => setTab('kitchen')}
+                onOpenDorm={() => setTab('dorm')}
+                onOpenDungeon={() => setTab('dungeon')}
+                onOpenCodex={() => setTab('codex')}
+              />
               <RecruitPanel />
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <FacilitiesPanel />
