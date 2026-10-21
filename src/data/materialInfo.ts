@@ -2,6 +2,7 @@ import { ELITE_CORE_OF, SIGIL_OF, levelUpCost } from './balance';
 import { CLASSES } from './classes';
 import { ELITE_SIGIL, MAP_DEFS, MONSTERS } from './monsters';
 import { RECIPES } from './recipes';
+import { LEVEL_CAP } from '../engine/types';
 import type { ClassId, MaterialId } from '../engine/types';
 
 /**
@@ -34,11 +35,11 @@ export interface UpgradeUsage {
   targets: number[];
 }
 
-/** 升级用途：扫描 levelUpCost(2..8, 全职业) 反查该材料出现的档位 */
+/** 升级用途：扫描 levelUpCost(2..LEVEL_CAP, 全职业) 反查该材料出现的档位 */
 export function upgradeUsagesOf(materialId: MaterialId): UpgradeUsage[] {
   const byClass = new Map<ClassId | null, Set<number>>();
   for (const cls of ALL_CLASSES) {
-    for (let target = 2; target <= 8; target++) {
+    for (let target = 2; target <= LEVEL_CAP; target++) {
       const cost = levelUpCost(target, cls);
       if (cost && (cost.materials[materialId] ?? 0) > 0) {
         if (!byClass.has(cls)) byClass.set(cls, new Set());
@@ -49,7 +50,7 @@ export function upgradeUsagesOf(materialId: MaterialId): UpgradeUsage[] {
   if (byClass.size === 0) return [];
   // 全职业通用档位 → 归并为 null
   const commonTargets = new Set<number>();
-  for (let target = 2; target <= 8; target++) {
+  for (let target = 2; target <= LEVEL_CAP; target++) {
     if (ALL_CLASSES.every((cls) => byClass.get(cls)?.has(target))) commonTargets.add(target);
   }
   const usages: UpgradeUsage[] = [];

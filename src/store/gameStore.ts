@@ -306,9 +306,6 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     const adv = s.roster.find((a) => a.id === adventurerId);
     if (!adv) return { ok: false, message: '冒险者不存在' };
     if (adv.level >= LEVEL_CAP) return { ok: false, message: '已达 10 级传奇——这个世界没有更强的了' };
-    if (adv.level >= BALANCE.UPGRADE_CAP) {
-      return { ok: false, message: '9、10 级仪式暂未开放（当前上限 8 级，高等级只能靠稀有访客）' };
-    }
     const need = expToNext(adv.level);
     if (adv.exp < need) {
       return { ok: false, message: `历练不足（经验 ${adv.exp}/${need}）` };

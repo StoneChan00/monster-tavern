@@ -1,4 +1,4 @@
-import { BALANCE, ELITE_CORE_OF, dormRestMult, SIGIL_OF } from '../data/balance';
+import { BALANCE, ELITE_CORE_OF, dormRestMult, sigilDropCount, SIGIL_OF } from '../data/balance';
 import {
   CLASSES,
   MAGE_AOE_RATIO,
@@ -147,15 +147,16 @@ function onMonsterKilled(state: GameState, target: MonsterInstance, offlineMult:
     state.inventory[d.materialId] = (state.inventory[d.materialId] ?? 0) + d.count;
     parts.push(`${MATERIALS[d.materialId]?.name ?? d.materialId} +${d.count}`);
   }
-  // 精英掉落：职业徽记 ×1 + 本图魔核 ×1（升级仪式硬通货）
+  // 精英掉落：职业徽记 ×(1~3，越深越多) + 本图魔核 ×1（升级仪式硬通货）
   if (target.elite) {
     const map = MAPS[state.dungeon.mapId];
     const sigil = SIGIL_OF[target.elite.sigil];
     const core = ELITE_CORE_OF[map.number];
-    state.inventory[sigil] = (state.inventory[sigil] ?? 0) + 1;
+    const sigilCount = sigilDropCount(map.number);
+    state.inventory[sigil] = (state.inventory[sigil] ?? 0) + sigilCount;
     if (core) {
       state.inventory[core] = (state.inventory[core] ?? 0) + 1;
-      parts.push(`${MATERIALS[sigil]?.icon ?? '🎖️'}${MATERIALS[sigil]?.name ?? sigil} +1`);
+      parts.push(`${MATERIALS[sigil]?.icon ?? '🎖️'}${MATERIALS[sigil]?.name ?? sigil} +${sigilCount}`);
       parts.push(`${MATERIALS[core]?.icon ?? '🟣'}${MATERIALS[core]?.name ?? core} +1`);
     }
   }

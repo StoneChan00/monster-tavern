@@ -7,6 +7,7 @@ import { BALANCE, levelUpCost, wageOfLevel } from '../data/balance';
 import { CLASSES } from '../data/classes';
 import { RACES } from '../data/races';
 import { MATERIALS } from '../data/materials';
+import { materialSourceText } from '../data/materialInfo';
 import { expToNext, getAdventurerStats, levelTier } from '../engine/stats';
 import { LEVEL_CAP } from '../engine/types';
 import type { AdventurerState } from '../engine/types';
@@ -27,9 +28,8 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
   const rowLabel = inParty ? (ROW_LABEL[BALANCE.SLOT_ROWS[slot]] ?? '') : '';
   const wage = wageOfLevel(adv.level);
   const tier = levelTier(adv.level);
-  // 升级仪式费用：2/3 级用普通掉落，3→8 级对应图 1-5 精英材料，9/10 暂未开放
-  const upgradeLocked = adv.level >= BALANCE.UPGRADE_CAP;
-  const cost = upgradeLocked || atCap ? null : levelUpCost(adv.level + 1, adv.classId);
+  // 升级仪式费用：2/3 级用普通掉落，4-8 级对应图 1-5 魔核，9/10 级对应图6（魔核6 + 图6 材料）
+  const cost = atCap ? null : levelUpCost(adv.level + 1, adv.classId);
 
   const canPay =
     cost !== null &&
@@ -44,6 +44,14 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
             .filter(([mid, cnt]) => (s.inventory[mid] ?? 0) < (cnt ?? 0))
             .map(([mid, cnt]) => `${MATERIALS[mid]?.name ?? mid} 不足（还需 ${(cnt ?? 0) - (s.inventory[mid] ?? 0)}）`)
             .join('，') || '材料不足';
+
+  // 缺料时给出「去哪刷」的反查提示（来源由数据推导，不写死文案）
+  const missingSources = cost
+    ? (Object.entries(cost.materials) as Array<[string, number | undefined]>)
+        .filter(([mid, cnt]) => (s.inventory[mid] ?? 0) < (cnt ?? 0))
+        .map(([mid]) => [mid, materialSourceText(mid as keyof typeof MATERIALS)] as const)
+        .filter(([, text]) => text !== '')
+    : [];
 
   return (
     <Panel
@@ -116,10 +124,6 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
           <div className="border-2 border-[#8a6d2f] bg-[#2a2115] p-1.5 text-center text-[11px] font-bold text-[#f0d78c]">
             ⭐ 10 级传奇——这个世界没有更强的了
           </div>
-        ) : upgradeLocked ? (
-          <div className="border-2 border-[#3a2d1e] bg-[#1f1812] p-1.5 text-center text-[11px] font-bold text-[#a89880]">
-            🔒 9、10 级仪式暂未开放（当前上限 8 级，高等级只能靠稀有访客）
-          </div>
         ) : expReady ? (
           <div className="space-y-1">
             <div className="text-[10px] text-[#a89880]">
@@ -131,6 +135,15 @@ export function AdventurerCard({ adv }: { adv: AdventurerState }) {
                 </span>
               ))}
             </div>
+            {missingSources.length > 0 ? (
+              <div className="space-y-0.5 border-l-2 border-[#5c4325] pl-1.5 text-[10px] leading-snug text-[#8a7a62]">
+                {missingSources.map(([mid, source]) => (
+                  <div key={mid}>
+                    📍 {MATERIALS[mid]?.name ?? mid}：{source}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <button
               type="button"
               className="pixel-btn pixel-btn-primary w-full"

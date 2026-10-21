@@ -23,6 +23,7 @@ import {
   BALANCE,
   levelUpCost,
   rosterCap,
+  sigilDropCount,
   signCostOfLevel,
   signMaterialOfLevel,
   visitorLevelWeights,
@@ -539,7 +540,7 @@ describe('D&D 升级仪式', () => {
     expect(after.events.some((e) => e.kind === 'levelup')).toBe(true);
   });
 
-  it('升级费用曲线：2-3 级普通掉落，4-8 级职业徽记+对应图魔核，9/10 返回 null', () => {
+  it('升级费用曲线：2-3 级普通掉落，4-8 级职业徽记+图1-5 魔核，9-10 级图6 魔核+图6 材料', () => {
     expect(levelUpCost(2, 'warrior')!.materials).toEqual({ mat_gel: 10 });
     expect(levelUpCost(3, 'warrior')!.materials).toEqual({ mat_carapace: 8 });
     const c4 = levelUpCost(4, 'mage')!;
@@ -548,8 +549,18 @@ describe('D&D 升级仪式', () => {
     const c8 = levelUpCost(8, 'rogue')!;
     expect(c8.materials.mat_sigil_rogue).toBe(3);
     expect(c8.materials.mat_elite_core_5).toBe(7); // 升到 8 级 ← 图5
-    expect(levelUpCost(9, 'warrior')).toBeNull();
-    expect(levelUpCost(10, 'warrior')).toBeNull();
+    const c9 = levelUpCost(9, 'warrior')!;
+    expect(c9.materials.mat_elite_core_6).toBe(8); // 升到 9 级 ← 图6
+    expect(c9.materials.mat_void_essence).toBe(10); // 图6 独有材料
+    const c10 = levelUpCost(10, 'priest')!;
+    expect(c10.materials.mat_elite_core_6).toBe(12);
+    expect(c10.materials.mat_core).toBe(10);
+    // 11 级超出上限
+    expect(levelUpCost(11, 'warrior')).toBeNull();
+  });
+
+  it('精英徽记掉落随地图加深递增（图1-2 → 1，图3-4 → 2，图5-6 → 3）', () => {
+    expect([1, 2, 3, 4, 5, 6].map((n) => sigilDropCount(n))).toEqual([1, 1, 2, 2, 3, 3]);
   });
 
   it('经验不足 / 材料不足 / 10 级封顶 均拒绝', () => {
@@ -573,15 +584,19 @@ describe('D&D 升级仪式', () => {
     expect(r3.message).toContain('传奇');
   });
 
-  it('9、10 级仪式暂未开放：8 级经验满也拒绝（UPGRADE_CAP）', () => {
+  it('9、10 级仪式已开放：8 级满经验可以升到 9 级（不再被 UPGRADE_CAP 拦住）', () => {
     const s = freshState();
-    s.roster[0].level = BALANCE.UPGRADE_CAP;
+    s.roster[0].level = 8;
     s.roster[0].exp = 99999;
     s.player.gold = 999999;
+    s.inventory['mat_sigil_warrior'] = 99;
+    s.inventory['mat_elite_core_6'] = 99;
+    s.inventory['mat_void_essence'] = 99;
     setStoreState(s);
     const r = useGameStore.getState().levelUpAdventurer('adv_hank');
-    expect(r.ok).toBe(false);
-    expect(r.message).toContain('暂未开放');
+    expect(r.ok).toBe(true);
+    expect(useGameStore.getState().state.roster[0].level).toBe(9);
+    expect(BALANCE.UPGRADE_CAP).toBe(LEVEL_CAP);
   });
 
   it('等级档位：Lv10 传奇、Lv5 资深、Lv1 学徒', () => {

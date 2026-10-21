@@ -10,6 +10,7 @@
 
 - ⚔️ **Six themed maps**: Mossy Caverns → Void's End, with endless wave cycles. Each wave has a 5% chance to spawn an **elite**; every map's elite pool covers all 6 classes — killing one drops that class's sigil plus the map's core, the only source of promotion materials
 - 🧑‍🤝‍🧑 **D&D-style adventurers**: 6 classes × 9 races, Lv1–10. Once EXP is full you must hold a **promotion ceremony** at the tavern (class sigil + that map's elite core)
+- 📈 **Promotion tier follows the maps**: Lv2-4 on map 1, Lv5 map 2, Lv6 map 3, Lv7 map 4, Lv8 map 5, Lv9-10 map 6. Elite sigil drops also scale with depth (1 → 2 → 3), so deeper dungeons pay better
 - 🍳 **Menu-driven kitchen**: dishes on the menu consume ingredients hourly to keep their buffs. Combine a starter + main + drink structure to earn stacking set bonuses
 - 🍻 **Food is recruitment**: unlocking recipes raises the visit weight of the matching class
 - 💀 **Failure-friendly**: the first party wipe grants emergency aid; offline earnings settle normally (8h cap)
@@ -41,7 +42,7 @@ Requires Node 20+ and pnpm 10:
 ```bash
 pnpm install
 pnpm dev      # http://localhost:5173/monster-tavern/
-pnpm test     # 106 cases: engine / scene depth / cloud sync decisions & revision guard
+pnpm test     # 114 cases: engine / material sources / scene depth / cloud sync decisions & revision guard
 pnpm build    # output to dist/
 pnpm preview  # preview the production build
 ```

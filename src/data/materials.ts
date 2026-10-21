@@ -227,7 +227,7 @@ export const MAT_ELITE_CORE_6: MaterialDef = {
   sprite: 'items/mat_elite_core_6.png',
   kind: 'build',
   tier: 7,
-  desc: '虚空终焉精英坍缩成的完美结晶。9、10 级仪式暂未开放，先替你收着。',
+  desc: '虚空终焉精英坍缩成的完美结晶。9、10 级仪式的核心材料。',
 };
 
 // ── 职业徽记（6 种，职业对应精英掉落；升级仪式硬通货） ──

@@ -75,8 +75,8 @@ export const BALANCE = {
   // ── 经济（D&D 等级制） ───────────────
   DAY_MS: 86_400_000,
 
-  /** 玩家可手动升级的上限（9、10 级仪式暂未开放，只能靠稀有访客） */
-  UPGRADE_CAP: 8,
+  /** 玩家可手动升级的上限（与 LEVEL_CAP 一致：10 级传奇需要通关图6 的魔核） */
+  UPGRADE_CAP: 10,
 } as const;
 
 /** 日薪 = 2 × 等级²（Lv1=2，Lv5=50，Lv10=200） */
@@ -135,8 +135,8 @@ export interface LevelUpCostDef {
 /**
  * D&D 升级仪式费用（经验攒满后仍需支付）：
  * - 升到 2、3 级：普通魔物掉落（凝胶/甲壳）
- * - 升到 3~8 级：职业徽记（对应职业精英掉落）+ 对应图的精英魔核（图1→3级 … 图6→8级）
- * - 9、10 级：暂未开放（返回 null），只能通过稀有访客获得高等级冒险者
+ * - 升到 3~8 级：职业徽记（对应职业精英掉落）+ 对应图的精英魔核（图1→4级 … 图5→8级）
+ * - 升到 9、10 级：图6 魔核 + 图6 独有材料（虚空精华 / 源质核心），保持「越高越深」的梯度
  * 索引 = 目标等级（costOfLevel(2) = Lv1→2 的费用）。
  */
 export function levelUpCost(targetLevel: number, classId: ClassId): LevelUpCostDef | null {
@@ -156,9 +156,23 @@ export function levelUpCost(targetLevel: number, classId: ClassId): LevelUpCostD
       return { gold: 1600, materials: { [sigil]: 2, mat_elite_core_4: 6 } };
     case 8:
       return { gold: 2500, materials: { [sigil]: 3, mat_elite_core_5: 7 } };
+    case 9:
+      return { gold: 4000, materials: { [sigil]: 4, mat_elite_core_6: 8, mat_void_essence: 10 } };
+    case 10:
+      return { gold: 6000, materials: { [sigil]: 5, mat_elite_core_6: 12, mat_core: 10 } };
     default:
-      return null; // 9、10 级仪式暂未开放
+      return null;
   }
+}
+
+/**
+ * 精英掉落职业徽记的数量：越深的地牢产出越高（图1-2 → 1，图3-4 → 2，图5-6 → 3）。
+ * 让「高级晋升」自然地要求玩家往后面的地图推进，同时保留回前图补刷的容错。
+ */
+export function sigilDropCount(mapNumber: number): number {
+  if (mapNumber <= 2) return 1;
+  if (mapNumber <= 4) return 2;
+  return 3;
 }
 
 /**
