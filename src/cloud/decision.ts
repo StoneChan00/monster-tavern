@@ -1,9 +1,12 @@
 /**
  * 云同步决策：纯函数，不碰 Firebase / DOM，便于单测覆盖全部冲突分支。
  *
- * 判定用的是「版本号 + 时间戳」两个信号：
+ * 判定用的是「版本号 + 本地真实存档时间」两个信号：
  *   - 云档 rev 是否还在我们上次同步时的基线（检测别的设备是否写过）
- *   - 本地档 exportedAt 是否晚于上次同步（检测本机是否继续玩过）
+ *   - 本地持久化存档的 exportedAt 是否晚于上次同步（检测本机是否继续玩过）
+ *
+ * 注意：localSavedAt 必须是「本地真正落盘时」的时间，不能在每次读取时重新
+ * serialize（exportedAt: Date.now()）得到假时间，否则本机永远像是有新进度。
  * 两个信号互相矛盾（我们都玩过、对方也写过）就是冲突，绝不静默覆盖。
  */
 import { SAVE_MAGIC } from '../save/migrate';
@@ -52,13 +55,21 @@ export function decideSyncAction(s: SyncState): SyncAction {
   // 本地没有可解析的档（例如刚清了浏览器数据）：直接拉云端
   if (s.localSavedAt === null) return 'download';
 
-  // 云档还是我们上次同步的那一版：远端没被别的设备改过
-  if (s.remoteRev === s.baseRev) {
-    const localAdvanced = s.lastSyncedLocalSavedAt === null || s.localSavedAt > s.lastSyncedLocalSavedAt;
-    return localAdvanced ? 'upload' : 'in-sync';
-  }
+  // 本机在上次同步后是否真的写过盘。lastSyncedLocalSavedAt 为空表示没有基线，
+  // 无法证明本地只是云端的副本，按「可能改过」处理。
+  const localChanged =
+    s.lastSyncedLocalSavedAt === null || s.localSavedAt > s.lastSyncedLocalSavedAt;
 
-  // 远端被别的设备写过：对方比本机更晚活动就直接拉，否则交给玩家决定
+  // 云档还是我们上次同步的那一版：远端没被别的设备改过，本地是云端的后代。
+  // 本地有更新就上传；否则无需动作。
+  if (s.remoteRev === s.baseRev) return localChanged ? 'upload' : 'in-sync';
+
+  // 远端被别的设备写过，但本机自上次同步后没有产生新存档：
+  // 本地只是旧云端副本，云端才是唯一前进的一侧 → 直接下载覆盖，不打扰玩家。
+  if (!localChanged) return 'download';
+
+  // 两边都产生了新进度：只有远端存档时间明确更晚时才自动采用云端；
+  // 时间相同/本机更晚都无法证明云端包含本机进度，交给玩家决定。
   return (s.remoteUpdatedAt ?? 0) > s.localSavedAt ? 'download' : 'conflict';
 }
 

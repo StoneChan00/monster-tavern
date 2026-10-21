@@ -14,6 +14,7 @@ import type { Database } from 'firebase/database';
 import { CLOUD_CONFIGURED, MAX_CLOUD_BYTES } from '../cloud/config';
 import { decideSyncAction, extractSavedAt, looksLikeFreshSave } from '../cloud/decision';
 import { getDeviceId, loadMeta, saveMeta } from '../cloud/meta';
+import { localStorageAdapter } from '../save/adapter';
 import { onLocalSave } from '../save/bus';
 import { useGameStore } from './gameStore';
 
@@ -103,6 +104,17 @@ function localRaw(): string {
   return useGameStore.getState().exportSaveString();
 }
 
+/**
+ * 本地「已落盘」存档的 exportedAt。
+ *
+ * 不能用 localRaw() 现序列化取时间：serialize() 每次都会写一个新的
+ * exportedAt=Date.now()，读一次就变一次，会让本机永远被判定为「有新进度」。
+ * 判断本机是否动过必须看最后一次真正写入 localStorage 的存档时间。
+ */
+function persistedLocalSavedAt(): number | null {
+  return extractSavedAt(localStorageAdapter.load());
+}
+
 /** 把云端存档灌进引擎（含校验与版本迁移），并立刻落本地 */
 function applyRemoteJson(json: string): boolean {
   const result = useGameStore.getState().importSaveString(json);
@@ -152,10 +164,30 @@ async function pushNow(force: boolean): Promise<void> {
     }
     if (result.kind === 'conflict') {
       const remote = await modules.storeApi.readCloud(modules.db, user.uid).catch(() => null);
+      const latestMeta = loadMeta(user.uid);
+      const localSavedAt = persistedLocalSavedAt();
+      const action = decideSyncAction({
+        localSavedAt,
+        lastSyncedLocalSavedAt: latestMeta.lastSyncedLocalSavedAt,
+        baseRev: latestMeta.baseRev,
+        remoteRev: remote?.rev ?? null,
+        remoteUpdatedAt: remote?.updatedAt ?? null,
+      });
+      // 守卫失败不等于「两边都改过」：如果本机自上次同步后其实没落过盘，
+      // 说明只是别的设备推进了云端，直接拉取即可，不该弹冲突框。
+      if (remote && action === 'download') {
+        await pullNow();
+        return;
+      }
+      if (remote && action === 'in-sync') {
+        recordSync(user.uid, remote.rev, localSavedAt);
+        useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), conflict: null, message: null });
+        return;
+      }
       useCloudStore.setState({
         status: 'conflict',
         conflict: {
-          localSavedAt: extractSavedAt(raw),
+          localSavedAt,
           remoteSavedAt: remote?.savedAt ?? 0,
           remoteRev: remote?.rev ?? 0,
         },
@@ -197,7 +229,8 @@ async function pullNow(): Promise<void> {
       useCloudStore.setState({ status: 'error', message: '云端存档无法识别（版本或格式不符），已保留本地进度' });
       return;
     }
-    recordSync(user.uid, remote.rev, extractSavedAt(localRaw()));
+    // 读取刚写入 localStorage 的真实存档时间；若存储不可用则退回云档自身时间。
+    recordSync(user.uid, remote.rev, persistedLocalSavedAt() ?? extractSavedAt(remote.json));
     useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), conflict: null, message: '已载入云端存档' });
   } catch (err) {
     console.error('[cloud] pull failed:', err);
@@ -214,7 +247,8 @@ async function resolveInitial(user: CloudUser): Promise<void> {
     const remote = await modules.storeApi.readCloud(modules.db, user.uid);
     const meta = loadMeta(user.uid);
     const action = decideSyncAction({
-      localSavedAt: extractSavedAt(localRaw()),
+      // 关键：用已落盘存档的时间，而不是现序列化出来的「现在」。
+      localSavedAt: persistedLocalSavedAt(),
       lastSyncedLocalSavedAt: meta.lastSyncedLocalSavedAt,
       baseRev: meta.baseRev,
       remoteRev: remote?.rev ?? null,
@@ -230,7 +264,11 @@ async function resolveInitial(user: CloudUser): Promise<void> {
       return;
     }
     if (action === 'in-sync') {
-      recordSync(user.uid, remote?.rev ?? meta.baseRev, extractSavedAt(localRaw()));
+      recordSync(
+        user.uid,
+        remote?.rev ?? meta.baseRev,
+        persistedLocalSavedAt() ?? remote?.savedAt ?? null,
+      );
       useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), message: null });
       return;
     }
@@ -243,7 +281,7 @@ async function resolveInitial(user: CloudUser): Promise<void> {
     useCloudStore.setState({
       status: 'conflict',
       conflict: {
-        localSavedAt: extractSavedAt(localRaw()),
+        localSavedAt: persistedLocalSavedAt(),
         remoteSavedAt: remote?.savedAt ?? 0,
         remoteRev: remote?.rev ?? 0,
       },
