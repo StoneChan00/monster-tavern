@@ -58,18 +58,25 @@ VITE_FIREBASE_APP_ID=
 
 这些值都是公开信息（前端可见）。**真正的访问控制在数据库规则里**，不要试图靠隐藏 apiKey 做安全。
 
-CI（GitHub Pages）需要在仓库 Secrets 里放同样 5 项，并在 `.github/workflows/deploy-pages.yml` 的构建步骤前注入：
+### 线上构建（GitHub Pages）
 
-```yaml
-      - name: Build
-        run: pnpm build
-        env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_DATABASE_URL: ${{ secrets.VITE_FIREBASE_DATABASE_URL }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+本仓库采用**提交 `.env.production`** 的方式：Vite 在生产构建时自动读取，CI 不需要任何 Secrets 配置。
+
 ```
+# .env.production（已入库，值与 .env.local 一致）
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_DATABASE_URL=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_APP_ID=...
+```
+
+因为这几个值本来就会打包进前端 JS（任何人 DevTools 可见），入库不构成泄密；安全边界是第 4 节的数据库规则。
+
+> ⚠️ 一个容易踩的坑：`process.env` 里已存在的变量**优先级高于** `.env.*` 文件。如果你的 workflow 写了
+> `env: VITE_FIREBASE_API_KEY: ${{ secrets.X }}` 而 secrets 没配，注入的是**空字符串**，
+> 会把 `.env.production` 覆盖成空 → 云同步被关闭、登录按钮消失。本仓库的 workflow 因此**不注入**这些变量。
+> 若你更想用 Secrets，请同时删掉 `.env.production`（或改成 `.env.production.local`，它已被 gitignore）。
 
 未配置时构建照常成功，游戏退化为纯本地版本（顶栏不出现登录按钮）。
 
