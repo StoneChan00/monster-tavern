@@ -41,6 +41,9 @@ export interface CloudConflict {
   remoteRev: number;
 }
 
+/** 支持的第三方登录方式 */
+export type CloudProvider = 'google' | 'github';
+
 interface CloudStore {
   status: CloudStatus;
   user: CloudUser | null;
@@ -49,7 +52,7 @@ interface CloudStore {
   /** 一次性提示（「已载入云端存档」「同步失败」等） */
   message: string | null;
   init: () => void;
-  signIn: () => Promise<void>;
+  signIn: (provider?: CloudProvider) => Promise<void>;
   signOutNow: () => Promise<void>;
   /** 手动上传本地档（覆盖云端） */
   uploadLocal: () => Promise<void>;
@@ -274,6 +277,8 @@ function describeAuthError(err: unknown): string {
       return '登录被打断，请重试';
     case 'auth/popup-blocked':
       return '浏览器拦截了登录弹窗，请允许弹窗后重试';
+    case 'auth/account-exists-with-different-credential':
+      return '该邮箱已经用另一种方式登录过，请改用上次的方式（同一邮箱用不同登录方式会有两份独立存档）';
     case 'auth/unauthorized-domain':
       return `域名 ${host} 未获授权：需在 Firebase「身份验证 → 设置 → 授权域名」添加`;
     case 'auth/network-request-failed':
@@ -349,13 +354,16 @@ export const useCloudStore = create<CloudStore>((set, get) => ({
     });
   },
 
-  signIn: async () => {
+  signIn: async (provider = 'google') => {
     const modules = await loadCloudModules();
     if (!modules) return;
     try {
-      const provider = new modules.authApi.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      await modules.authApi.signInWithPopup(modules.auth, provider);
+      const authProvider =
+        provider === 'github'
+          ? new modules.authApi.GithubAuthProvider()
+          : new modules.authApi.GoogleAuthProvider();
+      if (provider === 'google') authProvider.setCustomParameters({ prompt: 'select_account' });
+      await modules.authApi.signInWithPopup(modules.auth, authProvider);
       // 登录成功后由 onAuthStateChanged → resolveInitial 接管
     } catch (err) {
       // 原始错误留在控制台，便于排查；顶栏只显示可执行的中文提示

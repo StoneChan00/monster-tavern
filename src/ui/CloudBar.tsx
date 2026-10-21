@@ -37,17 +37,25 @@ export function CloudBar() {
 
   if (!user) {
     return (
-      <span className="flex items-center gap-2">
+      <span className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           className="pixel-btn"
-          onClick={() => void signIn()}
+          onClick={() => void signIn('google')}
           title="用 Google 账号登录，存档可跨设备同步（不登录也能正常游玩）"
         >
-          ☁️ Google 登录
+          ☁️ Google
+        </button>
+        <button
+          type="button"
+          className="pixel-btn"
+          onClick={() => void signIn('github')}
+          title="用 GitHub 账号登录。注意：同一邮箱用不同登录方式会是两份独立存档"
+        >
+          🐙 GitHub
         </button>
         {status === 'error' && message ? (
-          <span className="max-w-[160px] truncate text-[10px] text-[#c0392b]" title={message}>
+          <span className="max-w-[220px] truncate text-[10px] text-[#c0392b]" title={message}>
             {message}
           </span>
         ) : null}

@@ -141,6 +141,22 @@ VITE_FIREBASE_APP_ID=...
 
 退出前会把进度推一次；本机存档保留，随时可以继续不登录游玩。
 
+### 多种登录方式（Google / GitHub）
+
+顶栏提供两个登录入口，都是 Firebase Authentication 的第三方提供方：
+
+- Google：Firebase 内置托管，**不需要**自建 OAuth 客户端
+- GitHub：需要先在 GitHub 建 OAuth App，回调地址填
+  `https://<project>.firebaseapp.com/__/auth/handler`，再把 Client ID / Secret 填进 Firebase 的 GitHub 提供方
+
+⚠️ **存档按 `uid` 隔离，而 uid 是「提供方 + 账号」的组合**。同一个人的 Google 账号和 GitHub 账号是两个不同的 uid，因此会有**两份互相独立的云端存档**，切登录方式等于换档。
+
+Firebase 在开启「每个邮箱一个账号」时会直接拒绝这种冲突并抛
+`auth/account-exists-with-different-credential`，UI 会提示「请改用上次的登录方式」。
+
+如果需要「同一玩家多种登录方式共用一份存档」，必须做**账号关联**（`linkWithCredential`）：
+先用一种方式登录，再在设置里关联另一种。本 POC 未实现，建议先只对外提供一种登录方式。
+
 ## 6. 本地验证（两台「设备」）
 
 1. `pnpm dev` → `http://localhost:5173/monster-tavern/`
