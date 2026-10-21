@@ -12,10 +12,28 @@ vi.mock('firebase/database', () => ({
   set: async (r: { path: string }, value: unknown) => {
     nodes.set(r.path, value);
   },
-  runTransaction: async (r: { path: string }, update: (current: unknown) => unknown) => {
-    const current = nodes.get(r.path) ?? null;
-    const next = update(current);
-    if (next === undefined) return { committed: false, snapshot: { val: () => current } };
+  runTransaction: async (
+    r: { path: string },
+    update: (current: unknown) => unknown,
+    options: { applyLocally?: boolean },
+  ) => {
+    if (options.applyLocally !== false) throw new Error('守卫事务必须关闭本地乐观执行');
+    // 第一次回调用本地缓存；get() 后缓存为空，模拟 currentData=null。
+    const actual = nodes.get(r.path) ?? null;
+    const optimistic = update(null);
+    if (optimistic === undefined) {
+      return { committed: false, snapshot: { val: () => actual } };
+    }
+    if (actual === null) {
+      nodes.set(r.path, optimistic);
+      return { committed: true, snapshot: { val: () => optimistic } };
+    }
+    if (JSON.stringify(optimistic) === JSON.stringify(actual)) {
+      return { committed: true, snapshot: { val: () => actual } };
+    }
+    // hash 不一致：RTDB 拿服务器真实数据重新执行事务回调。
+    const next = update(actual);
+    if (next === undefined) return { committed: false, snapshot: { val: () => actual } };
     nodes.set(r.path, next);
     return { committed: true, snapshot: { val: () => next } };
   },
@@ -48,6 +66,12 @@ describe('云存档读写', () => {
 
   it('守卫命中（rev 与期望一致）时写入 rev+1', async () => {
     await pushCloud(db, UID, raw(), { expectedRev: null });
+    const result = await pushCloud(db, UID, raw(), { expectedRev: 1 });
+    expect(result).toEqual({ kind: 'ok', rev: 2 });
+  });
+
+  it('事务首次回调读到空缓存时，仍以服务器真实 rev 为准', async () => {
+    await pushCloud(db, UID, raw(), { expectedRev: null }); // 服务器 rev=1
     const result = await pushCloud(db, UID, raw(), { expectedRev: 1 });
     expect(result).toEqual({ kind: 'ok', rev: 2 });
   });

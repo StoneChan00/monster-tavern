@@ -71,20 +71,25 @@ export async function pushCloud(
     return { kind: 'ok', rev };
   }
 
-  let guardFailed = false;
-  const result = await runTransaction(ref(db, cloudSavePath(uid)), (currentData: unknown) => {
-    const current = (currentData ?? null) as CloudRecord | null;
-    const currentRev = current && typeof current.rev === 'number' ? current.rev : 0;
-    const expected = options.expectedRev;
-    const mismatch = expected === null ? currentRev !== 0 : currentRev !== expected;
-    if (mismatch) {
-      guardFailed = true;
-      return undefined; // 中止事务：保留远端内容
-    }
-    return buildRecord(currentRev + 1);
-  });
+  // 事务第一次回调读的是本地缓存，而前面的 get() 可能已把缓存清空。
+  // 此时 currentData 为 null，不能直接 return undefined，否则事务还没发到
+  // 服务器就被中止，云端 rev 没变也会误报冲突。改为原样返回当前值，让
+  // RTDB 用服务器数据重新回调；只有最终真实 rev 与 expectedRev 匹配才提交。
+  let guardMatched = false;
+  const result = await runTransaction(
+    ref(db, cloudSavePath(uid)),
+    (currentData: unknown) => {
+      const current = (currentData ?? null) as CloudRecord | null;
+      const currentRev = current && typeof current.rev === 'number' ? current.rev : 0;
+      const expected = options.expectedRev;
+      guardMatched = expected === null ? currentRev === 0 : currentRev === expected;
+      if (!guardMatched) return current;
+      return buildRecord(currentRev + 1);
+    },
+    { applyLocally: false },
+  );
 
-  if (guardFailed || !result.committed) return { kind: 'conflict' };
+  if (!guardMatched || !result.committed) return { kind: 'conflict' };
 
   const committed = result.snapshot.val() as CloudRecord | null;
   return { kind: 'ok', rev: committed?.rev ?? 0 };
