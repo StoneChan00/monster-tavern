@@ -4,6 +4,10 @@ import { fmtDateTime } from '../utils/format';
 /** 云同步状态文案 */
 function statusText(status: ReturnType<typeof useCloudStore.getState>['status'], lastSyncAt: number | null): string {
   switch (status) {
+    case 'disabled':
+      return '本地存档';
+    case 'signed-out':
+      return '仅本地';
     case 'syncing':
       return '同步中…';
     case 'synced':
@@ -20,94 +24,66 @@ function statusText(status: ReturnType<typeof useCloudStore.getState>['status'],
 }
 
 /**
- * 顶栏云同步入口：未配置 Firebase 时整块不渲染（纯本地版本行为不变）。
- * 登录只是「多一个云端副本」，不登录也能完整游玩。
+ * 顶栏云同步入口：只保留用户、同步状态和退出。
+ * 上传/下载/导入/导出/重置统一收进「同步状态」弹窗。
  */
-export function CloudBar() {
+export function CloudBar({ onOpenSaveMenu }: { onOpenSaveMenu: () => void }) {
   const status = useCloudStore((s) => s.status);
   const user = useCloudStore((s) => s.user);
   const lastSyncAt = useCloudStore((s) => s.lastSyncAt);
   const message = useCloudStore((s) => s.message);
-  const signIn = useCloudStore((s) => s.signIn);
   const signOutNow = useCloudStore((s) => s.signOutNow);
-  const uploadLocal = useCloudStore((s) => s.uploadLocal);
-  const downloadCloud = useCloudStore((s) => s.downloadCloud);
-
-  if (status === 'disabled') return null;
-
-  if (!user) {
-    return (
-      <span className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className="pixel-btn"
-          onClick={() => void signIn('google')}
-          title="用 Google 账号登录，存档可跨设备同步（不登录也能正常游玩）"
-        >
-          ☁️ Google
-        </button>
-        <button
-          type="button"
-          className="pixel-btn"
-          onClick={() => void signIn('github')}
-          title="用 GitHub 账号登录。注意：同一邮箱用不同登录方式会是两份独立存档"
-        >
-          🐙 GitHub
-        </button>
-        {status === 'error' && message ? (
-          <span className="max-w-[220px] truncate text-[10px] text-[#c0392b]" title={message}>
-            {message}
-          </span>
-        ) : null}
-      </span>
-    );
-  }
 
   const badgeTone =
     status === 'conflict' || status === 'error'
       ? 'border-[#8a3a2a] text-[#e08a72]'
       : status === 'syncing'
         ? 'border-[#8a6a2a] text-[#d9a441]'
-        : 'border-[#4a6b2f] text-[#a5d47a]';
+        : status === 'disabled' || status === 'signed-out'
+          ? 'border-[#5c4325] text-[#a89880]'
+          : 'border-[#4a6b2f] text-[#a5d47a]';
 
   return (
-    <span className="flex items-center gap-1.5">
-      {user.photo ? (
-        <img src={user.photo} alt="" className="h-5 w-5 border-2 border-[#5c4325]" referrerPolicy="no-referrer" />
-      ) : null}
-      <span className="hidden max-w-[110px] truncate text-[11px] text-[#a89880] sm:inline" title={user.name}>
-        {user.name}
-      </span>
-      <span
-        className={`border-2 px-1 text-[10px] leading-4 font-bold ${badgeTone}`}
-        title={message ?? '云端副本状态，本机存档始终是主副本'}
-      >
-        {statusText(status, lastSyncAt)}
-      </span>
-      {message && (status === 'error' || status === 'conflict') ? (
-        <span className="max-w-[280px] truncate text-[10px] text-[#c0392b]" title={message}>
-          {message}
+    <span className="flex flex-wrap items-center gap-2">
+      {user ? (
+        <span className="flex items-center gap-1.5">
+          {user.photo ? (
+            <img
+              src={user.photo}
+              alt=""
+              className="h-5 w-5 border-2 border-[#5c4325]"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span aria-hidden="true">👤</span>
+          )}
+          <span className="hidden max-w-[110px] truncate text-[11px] text-[#a89880] sm:inline" title={user.name}>
+            {user.name}
+          </span>
+        </span>
+      ) : status !== 'disabled' ? (
+        <span className="flex items-center gap-1 text-[11px] text-[#a89880]">
+          <span aria-hidden="true">👤</span>
+          未登录
         </span>
       ) : null}
+
       <button
         type="button"
-        className="pixel-btn"
-        onClick={() => void uploadLocal()}
-        title="把本机存档上传到云端（会覆盖云端存档）"
+        className={`cursor-pointer border-2 px-1 text-[10px] leading-4 font-bold transition-colors hover:bg-[#332818] ${badgeTone}`}
+        onClick={onOpenSaveMenu}
+        title={message ?? '点击管理云同步、导入导出与重置存档'}
+        aria-label={`${statusText(status, lastSyncAt)}，打开存档与同步`}
+        aria-haspopup="dialog"
       >
-        ⏫
+        {statusText(status, lastSyncAt)}
       </button>
-      <button
-        type="button"
-        className="pixel-btn"
-        onClick={() => void downloadCloud()}
-        title="用云端存档覆盖本机（会丢本机进度）"
-      >
-        ⏬
-      </button>
-      <button type="button" className="pixel-btn" onClick={() => void signOutNow()} title="退出登录（本机存档保留）">
-        退出
-      </button>
+
+      {user ? (
+        <button type="button" className="pixel-btn" onClick={() => void signOutNow()} title="退出登录（本机存档保留）">
+          退出
+        </button>
+      ) : null}
     </span>
   );
 }

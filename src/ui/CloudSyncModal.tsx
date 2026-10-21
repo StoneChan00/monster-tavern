@@ -20,7 +20,7 @@ export function CloudSyncModal() {
         <p className="mb-3 text-center text-xs leading-relaxed text-[#a89880]">
           本机和云端都有你最近的进度，请选择保留哪一份。
           <br />
-          未选中的那份会被覆盖，建议先去顶栏「导出存档」备份。
+          未选中的那份会被覆盖，可点顶栏同步状态打开存档弹窗，先导出备份。
         </p>
 
         <div className="space-y-2 text-xs">
