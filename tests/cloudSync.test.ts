@@ -38,10 +38,32 @@ describe('云同步决策', () => {
     );
   });
 
+  it('云端被改过但本机自上次同步后没落盘 → 直接下载，不弹冲突', () => {
+    // 本机时间仍是基线时间：本地只是旧的云端副本，云端才是唯一推进的一侧。
+    // 即使远端 updatedAt 因时钟问题看起来更早，也应按 rev 判定为下载。
+    expect(
+      decideSyncAction(
+        snapshot({
+          remoteRev: 4,
+          remoteUpdatedAt: 500,
+          localSavedAt: 1000,
+          lastSyncedLocalSavedAt: 1000,
+        }),
+      ),
+    ).toBe('download');
+  });
+
   it('云端被改过但本机更晚 → 冲突，交给玩家决定', () => {
     expect(decideSyncAction(snapshot({ remoteRev: 4, remoteUpdatedAt: 1500, localSavedAt: 2000 }))).toBe(
       'conflict',
     );
+  });
+
+  it('本地时间戳不会因为「读一次档」而变化：基线之后没有新进度 → 无需动作', () => {
+    // 若调用方错误地把现序列化的 Date.now() 当成 localSavedAt，这里会误判为 upload。
+    expect(
+      decideSyncAction(snapshot({ localSavedAt: 1000, lastSyncedLocalSavedAt: 1000 })),
+    ).toBe('in-sync');
   });
 
   it('从未同步过的设备遇到云端档：远端更晚则下载', () => {
