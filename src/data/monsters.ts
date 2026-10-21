@@ -488,6 +488,157 @@ const VOID_IMP: MonsterDef = {
   ],
 };
 
+// ══════════ 精英补充：让每张图都有全部 6 职业的徽记来源 ══════════
+// 数值按所属地图的精英曲线内插；掉落复用本图普通怪已产出的材料。
+
+// ── 图1 苔藓洞窟：补 法师 / 吟游诗人 ──
+const SPORE_ORACLE: MonsterDef = {
+  id: 'spore_oracle', name: '孢语先知', icon: '🪄',
+  base: { hp: 300, atk: 18, def: 6, spd: 10 }, exp: 80, gold: 55,
+  drops: [
+    { materialId: 'mat_mushroom_cap', count: 2, weight: 10 },
+    { materialId: 'mat_rock_salt', count: 2, weight: 4 },
+  ],
+};
+const MOSS_MINSTREL: MonsterDef = {
+  id: 'moss_minstrel', name: '苔原吟游者', icon: '🎻',
+  base: { hp: 200, atk: 13, def: 5, spd: 12 }, exp: 50, gold: 32,
+  drops: [
+    { materialId: 'mat_wolf_meat', count: 2, weight: 10 },
+    { materialId: 'mat_gel', count: 2, weight: 4 },
+  ],
+};
+
+// ── 图2 秘银矿道：补 盗贼 / 牧师 / 游侠 / 吟游诗人 ──
+const PICKPOCKET_KING: MonsterDef = {
+  id: 'pickpocket_king', name: '镐影盗王', icon: '🗡️',
+  base: { hp: 800, atk: 36, def: 18, spd: 20 }, exp: 290, gold: 200,
+  drops: [
+    { materialId: 'mat_carapace', count: 2, weight: 10 },
+    { materialId: 'mat_mithril', count: 1, weight: 4 },
+  ],
+};
+const VEIN_CLERIC: MonsterDef = {
+  id: 'vein_cleric', name: '矿脉司祭', icon: '✨',
+  base: { hp: 850, atk: 34, def: 26, spd: 8 }, exp: 300, gold: 210,
+  drops: [
+    { materialId: 'mat_rock_salt', count: 2, weight: 10 },
+    { materialId: 'mat_jelly_tentacle', count: 1, weight: 4 },
+  ],
+};
+const SILVER_MARKSMAN: MonsterDef = {
+  id: 'silver_marksman', name: '秘银猎手', icon: '🏹',
+  base: { hp: 880, atk: 38, def: 16, spd: 17 }, exp: 320, gold: 225,
+  drops: [
+    { materialId: 'mat_lizard_tail', count: 2, weight: 10 },
+    { materialId: 'mat_mithril', count: 1, weight: 4 },
+  ],
+};
+const MINE_SONGSTRESS: MonsterDef = {
+  id: 'mine_songstress', name: '矿井歌者', icon: '🎶',
+  base: { hp: 780, atk: 33, def: 17, spd: 14 }, exp: 275, gold: 190,
+  drops: [
+    { materialId: 'mat_jelly_tentacle', count: 2, weight: 10 },
+    { materialId: 'mat_gel', count: 2, weight: 4 },
+  ],
+};
+
+// ── 图3 骸骨墓穴：补 战士 / 法师 / 牧师 / 游侠 / 吟游诗人 ──
+const BONE_CAPTAIN: MonsterDef = {
+  id: 'bone_captain', name: '骸骨统领', icon: '🛡️',
+  base: { hp: 1150, atk: 50, def: 32, spd: 7 }, exp: 450, gold: 330,
+  drops: [
+    { materialId: 'mat_carapace', count: 2, weight: 10 },
+    { materialId: 'mat_rock_salt', count: 2, weight: 4 },
+  ],
+};
+const CRYPT_HEXER: MonsterDef = {
+  id: 'crypt_hexer', name: '墓穴咒师', icon: '🔮',
+  base: { hp: 1180, atk: 54, def: 22, spd: 12 }, exp: 470, gold: 345,
+  drops: [
+    { materialId: 'mat_wraith_essence', count: 2, weight: 10 },
+    { materialId: 'mat_mushroom_cap', count: 2, weight: 4 },
+  ],
+};
+const GRAVE_KEEPER: MonsterDef = {
+  id: 'grave_keeper', name: '守墓牧师', icon: '✝️',
+  base: { hp: 1120, atk: 46, def: 28, spd: 9 }, exp: 435, gold: 315,
+  drops: [
+    { materialId: 'mat_flower_honey', count: 2, weight: 10 },
+    { materialId: 'mat_wraith_essence', count: 1, weight: 4 },
+  ],
+};
+const BONE_ARCHER: MonsterDef = {
+  id: 'bone_archer', name: '骨弓猎手', icon: '🏹',
+  base: { hp: 1140, atk: 49, def: 18, spd: 16 }, exp: 445, gold: 325,
+  drops: [
+    { materialId: 'mat_mithril', count: 2, weight: 10 },
+    { materialId: 'mat_carapace', count: 2, weight: 4 },
+  ],
+};
+const DIRGE_CHORUS: MonsterDef = {
+  id: 'dirge_chorus', name: '挽歌合唱者', icon: '🎼',
+  base: { hp: 1090, atk: 45, def: 20, spd: 15 }, exp: 425, gold: 305,
+  drops: [
+    { materialId: 'mat_flower_honey', count: 1, weight: 10 },
+    { materialId: 'mat_mushroom_cap', count: 2, weight: 4 },
+  ],
+};
+
+// ── 图4 熔岩裂隙：补 盗贼 / 游侠 / 吟游诗人 ──
+const MAGMA_CUTPURSE: MonsterDef = {
+  id: 'magma_cutpurse', name: '熔渣盗魁', icon: '🗡️',
+  base: { hp: 1500, atk: 60, def: 24, spd: 21 }, exp: 600, gold: 450,
+  drops: [
+    { materialId: 'mat_bat_wing', count: 2, weight: 10 },
+    { materialId: 'mat_core', count: 1, weight: 4 },
+  ],
+};
+const EMBER_MARKSMAN: MonsterDef = {
+  id: 'ember_marksman', name: '余烬猎手', icon: '🏹',
+  base: { hp: 1900, atk: 70, def: 30, spd: 18 }, exp: 780, gold: 600,
+  drops: [
+    { materialId: 'mat_lizard_tail', count: 2, weight: 10 },
+    { materialId: 'mat_abyss_tentacle', count: 1, weight: 4 },
+  ],
+};
+const FLAME_CHANTER: MonsterDef = {
+  id: 'flame_chanter', name: '炽焰颂者', icon: '🎺',
+  base: { hp: 1600, atk: 63, def: 28, spd: 13 }, exp: 640, gold: 480,
+  drops: [
+    { materialId: 'mat_troll_steak', count: 2, weight: 10 },
+    { materialId: 'mat_wraith_essence', count: 1, weight: 4 },
+  ],
+};
+
+// ── 图5 水晶回廊：补 盗贼 / 牧师 ──
+const PRISM_STALKER: MonsterDef = {
+  id: 'prism_stalker', name: '晶棱潜行者', icon: '🗡️',
+  base: { hp: 3400, atk: 100, def: 38, spd: 22 }, exp: 1180, gold: 950,
+  drops: [
+    { materialId: 'mat_crystal_jelly', count: 2, weight: 10 },
+    { materialId: 'mat_mithril', count: 1, weight: 4 },
+  ],
+};
+const CRYSTAL_BISHOP: MonsterDef = {
+  id: 'crystal_bishop', name: '晶簇主教', icon: '✨',
+  base: { hp: 3000, atk: 92, def: 44, spd: 10 }, exp: 1050, gold: 850,
+  drops: [
+    { materialId: 'mat_crystal_jelly', count: 2, weight: 10 },
+    { materialId: 'mat_wraith_essence', count: 2, weight: 4 },
+  ],
+};
+
+// ── 图6 虚空终焉：补 战士 ──
+const VOID_BULWARK: MonsterDef = {
+  id: 'void_bulwark', name: '虚界铁卫', icon: '🛡️',
+  base: { hp: 8600, atk: 176, def: 72, spd: 9 }, exp: 2600, gold: 2150,
+  drops: [
+    { materialId: 'mat_void_essence', count: 2, weight: 10 },
+    { materialId: 'mat_core', count: 1, weight: 4 },
+  ],
+};
+
 export const MONSTERS: Record<MonsterId, MonsterDef> = Object.fromEntries(
   [
     SLIME, BAT, MUSHROOM, SLIME_KING, BIG_SLIME, VENOM_BAT, BAT_LORD,
@@ -500,6 +651,13 @@ export const MONSTERS: Record<MonsterId, MonsterDef> = Object.fromEntries(
     MIND_FLAYER, ELDER_FLAYER, VOID_WRAITH, VOID_REAPER, PURPLE_WORM, CRYSTAL_DRAGON,
     NIGHTMARE_SHADE, SHADE_LORD, VOID_HEART_LARVA, THE_VOID_HEART,
     MUCK_SLUG, FAERIE, MUMMY, HELLHOUND, YETI, VOID_IMP,
+    // 精英补充：让每张图覆盖全部 6 职业（徽记来源）
+    SPORE_ORACLE, MOSS_MINSTREL,
+    PICKPOCKET_KING, VEIN_CLERIC, SILVER_MARKSMAN, MINE_SONGSTRESS,
+    BONE_CAPTAIN, CRYPT_HEXER, GRAVE_KEEPER, BONE_ARCHER, DIRGE_CHORUS,
+    MAGMA_CUTPURSE, EMBER_MARKSMAN, FLAME_CHANTER,
+    PRISM_STALKER, CRYSTAL_BISHOP,
+    VOID_BULWARK,
   ].map((m) => [m.id, m]),
 );
 
@@ -509,32 +667,49 @@ export const MONSTERS: Record<MonsterId, MonsterDef> = Object.fromEntries(
  * 徽记不区分地图，升级只需"该职业的精英"+"对应图的魔核"。
  */
 export const ELITE_SIGIL: Partial<Record<MonsterId, ClassId>> = {
-  // 战士（4）
+  // 战士（6）
   slime_king: 'warrior',
   golem_guard: 'warrior',
   troll_warlord: 'warrior',
   crystal_beetle_king: 'warrior',
-  // 法师（4）
+  bone_captain: 'warrior',
+  void_bulwark: 'warrior',
+  // 法师（6）
   weaver_queen: 'mage',
   nightmare: 'mage',
   crystal_mother: 'mage',
   shade_lord: 'mage',
-  // 盗贼（3）
+  spore_oracle: 'mage',
+  crypt_hexer: 'mage',
+  // 盗贼（6）
   bat_lord: 'rogue',
   skeleton_captain: 'rogue',
   void_reaper: 'rogue',
-  // 牧师（3）
+  pickpocket_king: 'rogue',
+  magma_cutpurse: 'rogue',
+  prism_stalker: 'rogue',
+  // 牧师（6）
   crab_king: 'priest',
   wraith_lord: 'priest',
   elder_flayer: 'priest',
-  // 游侠（3）
+  vein_cleric: 'priest',
+  grave_keeper: 'priest',
+  crystal_bishop: 'priest',
+  // 游侠（6）
   wolf_alpha: 'ranger',
   frost_basilisk: 'ranger',
   crystal_dragon: 'ranger',
-  // 吟游诗人（3）
+  silver_marksman: 'ranger',
+  bone_archer: 'ranger',
+  ember_marksman: 'ranger',
+  // 吟游诗人（7）
   gem_titan: 'bard',
   void_weaver: 'bard',
   the_void_heart: 'bard',
+  moss_minstrel: 'bard',
+  mine_songstress: 'bard',
+  dirge_chorus: 'bard',
+  flame_chanter: 'bard',
 };
 
 export interface MapDef {
@@ -571,7 +746,7 @@ export const MAP_DEFS: MapDef[] = [
   {
     id: 'map_1', number: 1, name: '苔藓洞窟', icon: '🕳️', sprite: 'items/map_1.png',
     monsterPool: ['slime', 'bat', 'mushroom', 'big_slime', 'venom_bat', 'rock_crab', 'spore_mushroom', 'moss_wolf', 'cave_lizard', 'muck_slug'],
-    elitePool: ['slime_king', 'bat_lord', 'crab_king', 'wolf_alpha'],
+    elitePool: ['slime_king', 'bat_lord', 'crab_king', 'wolf_alpha', 'spore_oracle', 'moss_minstrel'],
     firstClearReputation: 5,
     floorSprites: ['floor_mossy_1.png', 'floor_mossy_2.png', 'floor_mossy_3.png'], floorTint: 0xffffff,
     backdrop: 'backdrops/backdrop_map_1.png',
@@ -581,7 +756,7 @@ export const MAP_DEFS: MapDef[] = [
   {
     id: 'map_2', number: 2, name: '秘银矿道', icon: '⛏️', sprite: 'items/map_2.png',
     monsterPool: ['glow_jelly', 'stone_golem', 'shadow_spider', 'iron_beetle', 'moss_wolf', 'cave_lizard', 'rock_crab', 'faerie'],
-    elitePool: ['golem_guard', 'weaver_queen'],
+    elitePool: ['golem_guard', 'weaver_queen', 'pickpocket_king', 'vein_cleric', 'silver_marksman', 'mine_songstress'],
     firstClearReputation: 20,
     floorSprites: ['floor_mine_1.png', 'floor_mine_2.png', 'floor_mine_3.png'], floorTint: 0xffffff,
     backdrop: 'backdrops/backdrop_map_2.png',
@@ -591,7 +766,7 @@ export const MAP_DEFS: MapDef[] = [
   {
     id: 'map_3', number: 3, name: '骸骨墓穴', icon: '💀', sprite: 'items/map_3.png',
     monsterPool: ['skeleton', 'man_eater', 'shadow_spider', 'iron_beetle', 'spore_mushroom', 'mummy'],
-    elitePool: ['skeleton_captain'],
+    elitePool: ['skeleton_captain', 'bone_captain', 'crypt_hexer', 'grave_keeper', 'bone_archer', 'dirge_chorus'],
     firstClearReputation: 30,
     floorSprites: ['floor_crypt_1.png', 'floor_crypt_2.png', 'floor_crypt_3.png'], floorTint: 0xffffff,
     backdrop: 'backdrops/backdrop_map_3.png',
@@ -601,7 +776,7 @@ export const MAP_DEFS: MapDef[] = [
   {
     id: 'map_4', number: 4, name: '熔岩裂隙', icon: '🔥', sprite: 'items/map_4.png',
     monsterPool: ['acid_slime', 'cave_troll', 'wraith', 'basilisk', 'shadow_hunter', 'abyss_tentacle', 'obsidian_golem', 'hellhound'],
-    elitePool: ['troll_warlord', 'wraith_lord', 'nightmare'],
+    elitePool: ['troll_warlord', 'wraith_lord', 'nightmare', 'magma_cutpurse', 'ember_marksman', 'flame_chanter'],
     firstClearReputation: 42,
     floorSprites: ['floor_lava_1.png', 'floor_lava_2.png', 'floor_lava_3.png'], floorTint: 0xffffff,
     backdrop: 'backdrops/backdrop_map_4.png',
@@ -611,7 +786,7 @@ export const MAP_DEFS: MapDef[] = [
   {
     id: 'map_5', number: 5, name: '水晶回廊', icon: '💠', sprite: 'items/map_5.png',
     monsterPool: ['crystal_slime', 'crystal_bat', 'void_spider', 'ice_lizard', 'gem_golem', 'amethyst_beetle', 'wraith', 'yeti'],
-    elitePool: ['crystal_mother', 'gem_titan', 'void_weaver', 'frost_basilisk', 'crystal_beetle_king'],
+    elitePool: ['crystal_mother', 'gem_titan', 'void_weaver', 'frost_basilisk', 'crystal_beetle_king', 'prism_stalker', 'crystal_bishop'],
     firstClearReputation: 60,
     floorSprites: ['floor_crystal_1.png', 'floor_crystal_2.png', 'floor_crystal_3.png'], floorTint: 0xffffff,
     backdrop: 'backdrops/backdrop_map_5.png',
@@ -621,7 +796,7 @@ export const MAP_DEFS: MapDef[] = [
   {
     id: 'map_6', number: 6, name: '虚空终焉', icon: '🌌', sprite: 'items/map_6.png',
     monsterPool: ['mind_flayer', 'void_wraith', 'purple_worm', 'nightmare_shade', 'void_heart_larva', 'void_imp'],
-    elitePool: ['elder_flayer', 'void_reaper', 'crystal_dragon', 'shade_lord', 'the_void_heart'],
+    elitePool: ['elder_flayer', 'void_reaper', 'crystal_dragon', 'shade_lord', 'the_void_heart', 'void_bulwark'],
     firstClearReputation: 85,
     floorSprites: ['floor_void_1.png', 'floor_void_2.png', 'floor_void_3.png'], floorTint: 0xffffff,
     backdrop: 'backdrops/backdrop_map_6.png',

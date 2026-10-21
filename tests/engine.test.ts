@@ -260,21 +260,26 @@ describe('地图制随机波次（精英体系）', () => {
         expect(MONSTERS[mid]).toBeDefined();
         all.add(mid);
       }
+      const mapClasses = new Set<string>();
       for (const eid of m.elitePool) {
         expect(MONSTERS[eid]).toBeDefined();
         all.add(eid);
         const sigil = ELITE_SIGIL[eid];
         expect(sigil, `${eid} 应有职业徽记分配`).toBeDefined();
         sigilClasses.set(sigil!, (sigilClasses.get(sigil!) ?? 0) + 1);
+        mapClasses.add(sigil!);
       }
+      // 每张图都要覆盖全部 6 职业：任何职业在图内都能刷到自己的徽记，
+      // 避免「升到 Lv4 需要后期图才掉落的徽记」这种曲线断裂
+      expect(mapClasses.size, `图${m.number} ${m.name} 职业覆盖`).toBe(6);
       expect(m.firstClearReputation).toBeGreaterThan(prevRep);
       prevRep = m.firstClearReputation;
     }
-    // 59 种全部有归属（常规池 + 精英池）
+    // 全部魔物都有归属（常规池 + 精英池）
     expect(all.size).toBe(Object.keys(MONSTERS).length);
-    // 每职业 ≥3 只精英（跨图分布，徽记不区分地图）
+    // 每职业 ≥6 只精英（跨图分布，徽记不区分地图）
     for (const [cls, n] of sigilClasses) {
-      expect(n, `${cls} 精英数`).toBeGreaterThanOrEqual(3);
+      expect(n, `${cls} 精英数`).toBeGreaterThanOrEqual(6);
     }
     expect(sigilClasses.size).toBe(6);
   });

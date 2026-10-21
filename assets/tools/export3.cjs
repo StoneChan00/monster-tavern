@@ -183,6 +183,13 @@ const monsters = {
   mind_flayer: 66, elder_flayer: 121, void_wraith: 99, purple_worm: 76,
   nightmare_shade: 100, void_heart_larva: 37, crystal_dragon: 32,
   shade_lord: 39, void_reaper: 98, the_void_heart: 38,
+  // 精英补充（每图 6 职业覆盖）
+  spore_oracle: 1, moss_minstrel: 6,
+  pickpocket_king: 28, vein_cleric: 17, silver_marksman: 10, mine_songstress: 27,
+  bone_captain: 33, crypt_hexer: 41, grave_keeper: 18, bone_archer: 46, dirge_chorus: 7,
+  magma_cutpurse: 68, ember_marksman: 30, flame_chanter: 80,
+  prism_stalker: 50, crystal_bishop: 53,
+  void_bulwark: 118,
 };
 
 const argv = process.argv.slice(2);

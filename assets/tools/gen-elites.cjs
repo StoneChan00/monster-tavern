@@ -30,6 +30,13 @@ const ELITES = [
   'troll_warlord', 'wraith_lord', 'nightmare',
   'crystal_mother', 'gem_titan', 'void_weaver', 'frost_basilisk', 'crystal_beetle_king',
   'elder_flayer', 'void_reaper', 'crystal_dragon', 'shade_lord', 'the_void_heart',
+  // 精英补充（每图 6 职业覆盖）
+  'spore_oracle', 'moss_minstrel',
+  'pickpocket_king', 'vein_cleric', 'silver_marksman', 'mine_songstress',
+  'bone_captain', 'crypt_hexer', 'grave_keeper', 'bone_archer', 'dirge_chorus',
+  'magma_cutpurse', 'ember_marksman', 'flame_chanter',
+  'prism_stalker', 'crystal_bishop',
+  'void_bulwark',
 ];
 
 function rgbToHsl(r, g, b) {

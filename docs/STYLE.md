@@ -61,7 +61,7 @@ HP 绿 `#7cb342` · 饱食绿 `#a5d47a` · 魔物 HP 红 `#c0392b` · 经验紫 
 
 | 目录 | 内容 | 来源/许可 |
 |---|---|---|
-| `public/sprites/monsters/` | 魔物 59 + 精英变体 36 | Tiny Creatures（CC0）+ 程序化变体（原创，gen-elites.cjs） |
+| `public/sprites/monsters/` | 魔物 76 + 精英变体 37 | Tiny Creatures（CC0）+ 程序化变体（原创，gen-elites.cjs） |
 | `public/sprites/classes/` | 职业 6 | Tiny Creatures（CC0） |
 | `public/sprites/tiles/` | 地板 13 | Kenney Tiny Dungeon（CC0） |
 | `public/sprites/items/` | 菜谱 24 / 材料 29 / 地图 6 / 成就 17 / 种族徽章 9 | oga-16x16-food（CC0，描边加深再加工）+ 程序化自绘（原创） |

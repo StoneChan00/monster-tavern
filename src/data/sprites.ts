@@ -13,7 +13,7 @@ import type { MonsterId } from '../engine/types';
  */
 
 /**
- * 魔物图标（53 种全覆盖；键类型取自 MONSTERS，漏配会编译报错）。
+ * 魔物图标（76 种全覆盖；键类型取自 MONSTERS，漏配会编译报错）。
  * 同图内不重复借形；跨图复用（如 arachni/蜘蛛系、clay/iron 魔像系）由 tint 与主题区分。
  */
 export const MONSTER_SPRITES: Record<keyof typeof MONSTERS, string> = {
@@ -83,6 +83,24 @@ export const MONSTER_SPRITES: Record<keyof typeof MONSTERS, string> = {
   hellhound: 'hellhound.png', // 地狱犬
   yeti: 'yeti.png', // 雪怪
   void_imp: 'void_imp.png', // 小鬼
+  // ── 精英补充（每图 6 职业徽记来源） ──
+  spore_oracle: 'spore_oracle.png', // 凝胶（孢语先知）
+  moss_minstrel: 'moss_minstrel.png', // 蓝发人形（苔原吟游者）
+  pickpocket_king: 'pickpocket_king.png', // 橘色矮人（镐影盗王）
+  vein_cleric: 'vein_cleric.png', // 绿袍祭司（矿脉司祭）
+  silver_marksman: 'silver_marksman.png', // 戴帽射手（秘银猎手）
+  mine_songstress: 'mine_songstress.png', // 蓝发歌者（矿井歌者）
+  bone_captain: 'bone_captain.png', // 灰甲骸骨（骸骨统领）
+  crypt_hexer: 'crypt_hexer.png', // 蛇形咒师（墓穴咒师）
+  grave_keeper: 'grave_keeper.png', // 蓝袍守墓人
+  bone_archer: 'bone_archer.png', // 橘色弓手（骨弓猎手）
+  dirge_chorus: 'dirge_chorus.png', // 灰白幽魂（挽歌合唱者）
+  magma_cutpurse: 'magma_cutpurse.png', // 褐色人形（熔渣盗魁）
+  ember_marksman: 'ember_marksman.png', // 橙红恶魔（余烬猎手）
+  flame_chanter: 'flame_chanter.png', // 红角颂者（炽焰颂者）
+  prism_stalker: 'prism_stalker.png', // 白色晶体（晶棱潜行者）
+  crystal_bishop: 'crystal_bishop.png', // 独角兽（晶簇主教）
+  void_bulwark: 'void_bulwark.png', // 蓝色猫头鹰（虚界铁卫）
 };
 
 /** 职业角色图标（键类型取自 CLASSES；红骑士/女巫/天使/猫人/半人马/萨提尔） */
