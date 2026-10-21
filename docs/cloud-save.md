@@ -28,20 +28,26 @@
 ```jsonc
 // saves/{uid}
 {
-  "json": "<migrate.serialize() 产生的存档原文>", // 自带 magic/version/exportedAt
-  "rev": 12,                    // 单调递增，用于检测「别的设备写过」
+  "json": "<migrate.serialize() 产生的存档原文>", // 自带 magic/version/rev/baseRev
+  "rev": 12,                    // 当前云档版本
+  "baseRev": 11,                 // 上一个云档版本
   "savedAt": 1760000000000,      // 写入时存档内部 exportedAt 的快照
   "deviceId": "9f2a1c3d",        // 写入方设备（8 位随机 id）
   "updatedAt": 1760000000123     // 客户端写入时刻
 }
 ```
 
-本机另存一份同步基线（不参与存档内容）：
+本地存档原文也带同一套版本字段：
 
 ```jsonc
-// localStorage: monster-tavern:cloud-meta
-{ "uid": "...", "baseRev": 12, "lastSyncedLocalSavedAt": 1760000000000,
-  "lastSyncedAt": 1760000000123, "deviceId": "9f2a1c3d" }
+{
+  "magic": "monster-tavern-save",
+  "version": 7,
+  "state": { /* ... */ },
+  "exportedAt": 1760000000000,
+  "rev": 13,         // 本地存档版本
+  "baseRev": 12      // 本地存档基于的云端版本
+}
 ```
 
 ## 3. 环境变量
@@ -91,12 +97,15 @@ VITE_FIREBASE_APP_ID=...
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.hasChildren(['json', 'rev', 'savedAt'])",
+        ".validate": "newData.hasChildren(['json', 'rev', 'baseRev', 'savedAt'])",
         "json": {
           ".validate": "newData.isString() && newData.val().length < 524288"
         },
         "rev": {
           ".validate": "newData.isNumber() && newData.val() >= 1 && (!data.exists() || newData.val() > data.val())"
+        },
+        "baseRev": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
         },
         "savedAt": { ".validate": "newData.isNumber()" },
         "deviceId": { ".validate": "newData.isString() && newData.val().length <= 32" },
@@ -112,6 +121,7 @@ VITE_FIREBASE_APP_ID=...
 
 - 只能读写 `saves/{自己的 uid}`，别人的路径一律拒绝
 - `rev` 只允许递增，防止回滚覆盖
+- `baseRev` 记录上一个版本，用于判断本地和云端谁是后写入的一方
 - `json` 限长 512KB，`$other` 拒绝多余字段
 
 ## 5. 行为规格
@@ -122,29 +132,20 @@ VITE_FIREBASE_APP_ID=...
 | --- | --- |
 | 云端没有档 | 上传本地档（首次登录的老玩家） |
 | 本地没有可解析的档 | 下载云端档 |
-| 云端 `rev` 仍是上次同步的基线，且本地有更新 | 上传本地档 |
-| 云端 `rev` 仍是基线，本地也没更新 | 什么都不做 |
-| 云端被别的设备改过，但本机自上次同步后没有落盘 | 直接下载云端档（本地只是旧云端副本） |
-| 云端被别的设备改过，且比本地更晚 | 下载云端档 |
-| 云端被改过，但本地更晚 | **弹冲突弹窗**，玩家选 |
+| 本地 `baseRev` = 云 `rev` | 本地为准，直接上传 |
+| 云 `baseRev` = 本地 `rev` | 云端为准，直接下载 |
+| 两边版本相同且本地 `baseRev` = 云 `rev` | 无需同步 |
+| 以上都不满足 | **弹冲突弹窗**，玩家选 |
 | 冲突 + 本地是「几乎没玩过」的新档 | 直接下载云端档（新设备登录不打扰） |
 
 「几乎没玩过」判定：`meta.totalWavesCleared === 0 && roster.length <= 1`。
-
-> 自动覆盖只发生在能证明「只有一侧前进」的时候：云 `rev` 仍是基线 → 本地是云端后代，
-> 可上传；云 `rev` 变了但本地 `lastSyncedLocalSavedAt` 之后没有新落盘 → 云端是唯一前进侧，
-> 可下载。两边都变了才弹冲突。
->
-> 判定「本地有没有动过」必须用**最后一次真正写入 localStorage 的 `exportedAt`**，
-> 不能每次读取时临时 `serialize()`：那会把 `exportedAt` 刷成当前时间，让本机永远像有新进度，
-> 导致远端一有变化就误弹冲突。
 
 ### 同步时机
 
 - 本地存档每 30s 自动写一次（`BALANCE.AUTOSAVE_INTERVAL_S`），每次写都会标脏
 - 云端每 **2 分钟**推一次（`CLOUD_PUSH_INTERVAL_MS`），另有 `pagehide` / 切后台时立即推
-- 所有自动推送都带 `rev` 守卫：远端变了会先重新判定，若本机没有新落盘则自动拉取云端；
-  只有两边确实都前进过才停下并弹冲突，**绝不静默覆盖另一台设备的新进度**
+- 所有自动推送都带 `rev` 守卫：版本对不上时按 `baseRev` 重新判定，能确认先后就直接覆盖；
+  只有两边各自前进过才停下并弹冲突
 - 手动 ⏫ 上传 = 强制覆盖云端；手动 ⏬ 下载 = 强制覆盖本地（按钮 title 已写明后果）
 
 ### 退出登录

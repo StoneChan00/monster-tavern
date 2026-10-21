@@ -8,6 +8,13 @@ interface SaveEnvelope {
   version: number;
   state: unknown;
   exportedAt: number;
+  rev: number;
+  baseRev: number;
+}
+
+export interface SaveRevision {
+  rev: number;
+  baseRev: number;
 }
 
 /**
@@ -218,7 +225,7 @@ const migrations: Record<number, (s: Record<string, unknown>) => Record<string, 
   6: migrateV6toV7,
 };
 
-export function serialize(state: GameState): string {
+export function serialize(state: GameState, revision: SaveRevision = { rev: 0, baseRev: 0 }): string {
   // events 是瞬态回放流，不进存档
   const { events: _events, ...persistable } = state;
   return JSON.stringify({
@@ -226,7 +233,24 @@ export function serialize(state: GameState): string {
     version: SAVE_VERSION,
     state: persistable,
     exportedAt: Date.now(),
+    rev: revision.rev,
+    baseRev: revision.baseRev,
   } satisfies SaveEnvelope);
+}
+
+/** 从存档原文读取本地 rev / baseRev；旧存档没有这两个字段时按 0 处理。 */
+export function readSaveRevision(raw: string | null): SaveRevision | null {
+  if (!raw) return null;
+  try {
+    const env = JSON.parse(raw) as Partial<SaveEnvelope>;
+    if (env.magic !== SAVE_MAGIC) return null;
+    return {
+      rev: typeof env.rev === 'number' ? env.rev : 0,
+      baseRev: typeof env.baseRev === 'number' ? env.baseRev : 0,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** 解析 + 校验 + 迁移。任何失败返回 null（由调用方决定回退到新档）。 */

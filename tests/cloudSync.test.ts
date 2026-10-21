@@ -1,97 +1,46 @@
 import { describe, expect, it } from 'vitest';
 import { decideSyncAction, extractSavedAt, looksLikeFreshSave, type SyncState } from '../src/cloud/decision';
-import { serialize } from '../src/save/migrate';
+import { readSaveRevision, serialize } from '../src/save/migrate';
 import { createInitialState } from '../src/engine/initialState';
 
-/** 构造同步状态，默认「已同步且两边都没动」 */
+/** 构造同步状态：本地和云端都在 rev=3，且本地基于云端 rev=3 */
 function snapshot(over: Partial<SyncState> = {}): SyncState {
   return {
-    localSavedAt: 1000,
-    lastSyncedLocalSavedAt: 1000,
-    baseRev: 3,
+    localRev: 3,
+    localBaseRev: 3,
     remoteRev: 3,
-    remoteUpdatedAt: 1000,
+    remoteBaseRev: 2,
     ...over,
   };
 }
 
 describe('云同步决策', () => {
-  it('云端没有档时上传本地档（首次登录）', () => {
-    expect(decideSyncAction(snapshot({ remoteRev: null, remoteUpdatedAt: null }))).toBe('upload');
+  it('云端没有档时上传本地档', () => {
+    expect(decideSyncAction(snapshot({ remoteRev: null, remoteBaseRev: null }))).toBe('upload');
   });
 
-  it('本地没有可解析的档时下载云端档', () => {
-    expect(decideSyncAction(snapshot({ localSavedAt: null }))).toBe('download');
+  it('本地没有档时下载云端档', () => {
+    expect(decideSyncAction(snapshot({ localRev: null, localBaseRev: null }))).toBe('download');
   });
 
-  it('云端未被别的设备改过、本机继续玩过 → 上传', () => {
-    expect(decideSyncAction(snapshot({ localSavedAt: 2000 }))).toBe('upload');
-  });
-
-  it('云端未被改、本机也没新进度 → 无需动作', () => {
+  it('本地 rev 等于云端 rev 时无需同步', () => {
     expect(decideSyncAction(snapshot())).toBe('in-sync');
   });
 
-  it('云端被别的设备改过且更晚 → 下载云端', () => {
-    expect(decideSyncAction(snapshot({ remoteRev: 4, remoteUpdatedAt: 3000, localSavedAt: 2000 }))).toBe(
+  it('本地 baseRev 等于云端 rev 时本地为准，直接上传', () => {
+    expect(decideSyncAction(snapshot({ localRev: 4, localBaseRev: 3, remoteRev: 3 }))).toBe('upload');
+  });
+
+  it('云端 baseRev 等于本地 rev 时云端为准，直接下载', () => {
+    expect(decideSyncAction(snapshot({ localRev: 3, localBaseRev: 3, remoteRev: 4, remoteBaseRev: 3 }))).toBe(
       'download',
     );
   });
 
-  it('云端被改过但本机自上次同步后没落盘 → 直接下载，不弹冲突', () => {
-    // 本机时间仍是基线时间：本地只是旧的云端副本，云端才是唯一推进的一侧。
-    // 即使远端 updatedAt 因时钟问题看起来更早，也应按 rev 判定为下载。
-    expect(
-      decideSyncAction(
-        snapshot({
-          remoteRev: 4,
-          remoteUpdatedAt: 500,
-          localSavedAt: 1000,
-          lastSyncedLocalSavedAt: 1000,
-        }),
-      ),
-    ).toBe('download');
-  });
-
-  it('云端被改过但本机更晚 → 冲突，交给玩家决定', () => {
-    expect(decideSyncAction(snapshot({ remoteRev: 4, remoteUpdatedAt: 1500, localSavedAt: 2000 }))).toBe(
+  it('两边各自前进时交给玩家选择', () => {
+    expect(decideSyncAction(snapshot({ localRev: 4, localBaseRev: 3, remoteRev: 4, remoteBaseRev: 3 }))).toBe(
       'conflict',
     );
-  });
-
-  it('本地时间戳不会因为「读一次档」而变化：基线之后没有新进度 → 无需动作', () => {
-    // 若调用方错误地把现序列化的 Date.now() 当成 localSavedAt，这里会误判为 upload。
-    expect(
-      decideSyncAction(snapshot({ localSavedAt: 1000, lastSyncedLocalSavedAt: 1000 })),
-    ).toBe('in-sync');
-  });
-
-  it('从未同步过的设备遇到云端档：远端更晚则下载', () => {
-    expect(
-      decideSyncAction(
-        snapshot({
-          baseRev: 0,
-          remoteRev: 1,
-          lastSyncedLocalSavedAt: null,
-          localSavedAt: 1000,
-          remoteUpdatedAt: 2000,
-        }),
-      ),
-    ).toBe('download');
-  });
-
-  it('从未同步过但本机更晚：判为冲突而不是静默上传', () => {
-    expect(
-      decideSyncAction(
-        snapshot({
-          baseRev: 0,
-          remoteRev: 1,
-          lastSyncedLocalSavedAt: null,
-          localSavedAt: 5000,
-          remoteUpdatedAt: 2000,
-        }),
-      ),
-    ).toBe('conflict');
   });
 });
 
@@ -101,6 +50,17 @@ describe('存档时间戳解析', () => {
     const savedAt = extractSavedAt(raw);
     expect(savedAt).toBeTypeOf('number');
     expect(Math.abs(Date.now() - (savedAt as number))).toBeLessThan(10_000);
+  });
+
+  it('存档携带本地 rev / baseRev，旧存档按 0 处理', () => {
+    expect(readSaveRevision(serialize(createInitialState(), { rev: 7, baseRev: 5 }))).toEqual({
+      rev: 7,
+      baseRev: 5,
+    });
+    expect(readSaveRevision(JSON.stringify({ magic: 'monster-tavern-save', state: {} }))).toEqual({
+      rev: 0,
+      baseRev: 0,
+    });
   });
 
   it('损坏/伪造的存档一律视为无效', () => {

@@ -43,6 +43,7 @@ describe('云存档读写', () => {
     expect(result).toEqual({ kind: 'ok', rev: 1 });
     const cloud = await readCloud(db, UID);
     expect(cloud?.rev).toBe(1);
+    expect(cloud?.baseRev).toBe(0);
     expect(cloud?.savedAt).toBeGreaterThan(0);
   });
 
@@ -50,6 +51,7 @@ describe('云存档读写', () => {
     await pushCloud(db, UID, raw(), { expectedRev: null });
     const result = await pushCloud(db, UID, raw(), { expectedRev: 1 });
     expect(result).toEqual({ kind: 'ok', rev: 2 });
+    expect((await readCloud(db, UID))?.baseRev).toBe(1);
   });
 
   it('守卫不命中（别的设备已写过）时放弃写入并返回 conflict', async () => {
@@ -69,6 +71,7 @@ describe('云存档读写', () => {
     await pushCloud(db, UID, raw(), { expectedRev: 1 });
     const result = await pushCloud(db, UID, raw(), { expectedRev: 1, force: true });
     expect(result).toEqual({ kind: 'ok', rev: 3 });
+    expect((await readCloud(db, UID))?.baseRev).toBe(2);
   });
 
   it('超长存档与损坏存档都不上传', async () => {
@@ -84,5 +87,10 @@ describe('云存档读写', () => {
   it('读出结构异常的节点按无档处理', async () => {
     nodes.set(`saves/${UID}`, { json: 123, rev: 'x' });
     expect(await readCloud(db, UID)).toBeNull();
+  });
+
+  it('旧云档缺少 baseRev 时按 -1 处理', async () => {
+    nodes.set(`saves/${UID}`, { json: raw(), rev: 2, savedAt: Date.now() });
+    expect((await readCloud(db, UID))?.baseRev).toBe(-1);
   });
 });

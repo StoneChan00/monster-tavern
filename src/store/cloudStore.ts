@@ -13,8 +13,9 @@ import type { Auth } from 'firebase/auth';
 import type { Database } from 'firebase/database';
 import { CLOUD_CONFIGURED, MAX_CLOUD_BYTES } from '../cloud/config';
 import { decideSyncAction, extractSavedAt, looksLikeFreshSave } from '../cloud/decision';
-import { getDeviceId, loadMeta, saveMeta } from '../cloud/meta';
+import { getDeviceId, saveMeta } from '../cloud/meta';
 import { localStorageAdapter } from '../save/adapter';
+import { readSaveRevision } from '../save/migrate';
 import { onLocalSave } from '../save/bus';
 import { useGameStore } from './gameStore';
 
@@ -104,31 +105,23 @@ function localRaw(): string {
   return useGameStore.getState().exportSaveString();
 }
 
-/**
- * 本地「已落盘」存档的 exportedAt。
- *
- * 不能用 localRaw() 现序列化取时间：serialize() 每次都会写一个新的
- * exportedAt=Date.now()，读一次就变一次，会让本机永远被判定为「有新进度」。
- * 判断本机是否动过必须看最后一次真正写入 localStorage 的存档时间。
- */
-function persistedLocalSavedAt(): number | null {
-  return extractSavedAt(localStorageAdapter.load());
+function localRevision() {
+  return readSaveRevision(localStorageAdapter.load());
 }
 
-/** 把云端存档灌进引擎（含校验与版本迁移），并立刻落本地 */
-function applyRemoteJson(json: string): boolean {
+/** 把云端存档灌进引擎，并把本地 rev / baseRev 对齐到云端版本 */
+function applyRemoteJson(json: string, rev: number): boolean {
   const result = useGameStore.getState().importSaveString(json);
   if (!result.ok) return false;
-  useGameStore.getState().saveNow();
+  useGameStore.getState().saveNow(rev);
   return true;
 }
 
-/** 记录同步基线：下次据此判断本机/远端各自有没有新进度 */
-function recordSync(uid: string, rev: number, localSavedAt: number | null): void {
+function recordSync(uid: string, rev: number): void {
   saveMeta({
     uid,
     baseRev: rev,
-    lastSyncedLocalSavedAt: localSavedAt,
+    lastSyncedLocalSavedAt: null,
     lastSyncedAt: Date.now(),
     deviceId: getDeviceId(),
   });
@@ -149,45 +142,41 @@ async function pushNow(force: boolean): Promise<void> {
   const modules = await loadCloudModules();
   if (!modules) return;
 
-  const meta = loadMeta(user.uid);
-  // 从未同步过 → 期望云端为空；否则按上次同步的 rev 做守卫
-  const expectedRev = meta.lastSyncedAt > 0 ? meta.baseRev : null;
+  const local = localRevision();
+  const expectedRev = local && local.baseRev > 0 ? local.baseRev : null;
 
   pushing = true;
   useCloudStore.setState({ status: 'syncing', message: null });
   try {
     const result = await modules.storeApi.pushCloud(modules.db, user.uid, raw, { expectedRev, force });
     if (result.kind === 'ok') {
-      recordSync(user.uid, result.rev, extractSavedAt(raw));
+      useGameStore.getState().saveNow(result.rev);
+      recordSync(user.uid, result.rev);
       useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), conflict: null, message: null });
       return;
     }
     if (result.kind === 'conflict') {
       const remote = await modules.storeApi.readCloud(modules.db, user.uid).catch(() => null);
-      const latestMeta = loadMeta(user.uid);
-      const localSavedAt = persistedLocalSavedAt();
+      const latest = localRevision();
       const action = decideSyncAction({
-        localSavedAt,
-        lastSyncedLocalSavedAt: latestMeta.lastSyncedLocalSavedAt,
-        baseRev: latestMeta.baseRev,
+        localRev: latest?.rev ?? null,
+        localBaseRev: latest?.baseRev ?? null,
         remoteRev: remote?.rev ?? null,
-        remoteUpdatedAt: remote?.updatedAt ?? null,
+        remoteBaseRev: remote?.baseRev ?? null,
       });
-      // 守卫失败不等于「两边都改过」：如果本机自上次同步后其实没落过盘，
-      // 说明只是别的设备推进了云端，直接拉取即可，不该弹冲突框。
       if (remote && action === 'download') {
         await pullNow();
         return;
       }
       if (remote && action === 'in-sync') {
-        recordSync(user.uid, remote.rev, localSavedAt);
+        recordSync(user.uid, remote.rev);
         useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), conflict: null, message: null });
         return;
       }
       useCloudStore.setState({
         status: 'conflict',
         conflict: {
-          localSavedAt,
+          localSavedAt: extractSavedAt(localStorageAdapter.load()),
           remoteSavedAt: remote?.savedAt ?? 0,
           remoteRev: remote?.rev ?? 0,
         },
@@ -225,12 +214,11 @@ async function pullNow(): Promise<void> {
       useCloudStore.setState({ status: 'error', message: '云端存档无法识别，已保留本地进度' });
       return;
     }
-    if (!applyRemoteJson(remote.json)) {
+    if (!applyRemoteJson(remote.json, remote.rev)) {
       useCloudStore.setState({ status: 'error', message: '云端存档无法识别（版本或格式不符），已保留本地进度' });
       return;
     }
-    // 读取刚写入 localStorage 的真实存档时间；若存储不可用则退回云档自身时间。
-    recordSync(user.uid, remote.rev, persistedLocalSavedAt() ?? extractSavedAt(remote.json));
+    recordSync(user.uid, remote.rev);
     useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), conflict: null, message: '已载入云端存档' });
   } catch (err) {
     console.error('[cloud] pull failed:', err);
@@ -238,21 +226,19 @@ async function pullNow(): Promise<void> {
   }
 }
 
-/** 登录成功后的首次同步：按版本号/时间戳决定上传、下载还是交给玩家 */
+/** 登录成功后的首次同步：按 rev / baseRev 决定上传、下载还是交给玩家 */
 async function resolveInitial(user: CloudUser): Promise<void> {
   const modules = await loadCloudModules();
   if (!modules) return;
 
   try {
     const remote = await modules.storeApi.readCloud(modules.db, user.uid);
-    const meta = loadMeta(user.uid);
+    const local = localRevision();
     const action = decideSyncAction({
-      // 关键：用已落盘存档的时间，而不是现序列化出来的「现在」。
-      localSavedAt: persistedLocalSavedAt(),
-      lastSyncedLocalSavedAt: meta.lastSyncedLocalSavedAt,
-      baseRev: meta.baseRev,
+      localRev: local?.rev ?? null,
+      localBaseRev: local?.baseRev ?? null,
       remoteRev: remote?.rev ?? null,
-      remoteUpdatedAt: remote?.updatedAt ?? null,
+      remoteBaseRev: remote?.baseRev ?? null,
     });
 
     if (action === 'upload') {
@@ -264,11 +250,7 @@ async function resolveInitial(user: CloudUser): Promise<void> {
       return;
     }
     if (action === 'in-sync') {
-      recordSync(
-        user.uid,
-        remote?.rev ?? meta.baseRev,
-        persistedLocalSavedAt() ?? remote?.savedAt ?? null,
-      );
+      recordSync(user.uid, remote?.rev ?? local?.rev ?? 0);
       useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), message: null });
       return;
     }
@@ -281,7 +263,7 @@ async function resolveInitial(user: CloudUser): Promise<void> {
     useCloudStore.setState({
       status: 'conflict',
       conflict: {
-        localSavedAt: persistedLocalSavedAt(),
+        localSavedAt: extractSavedAt(localStorageAdapter.load()),
         remoteSavedAt: remote?.savedAt ?? 0,
         remoteRev: remote?.rev ?? 0,
       },

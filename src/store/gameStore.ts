@@ -12,7 +12,7 @@ import { createInitialState } from '../engine/initialState';
 import { pushLog, pushEvent } from '../engine/log';
 import { getAdventurerStats, expToNext, levelTier } from '../engine/stats';
 import { isSlotUnlocked } from '../engine/party';
-import { deserialize, serialize } from '../save/migrate';
+import { deserialize, readSaveRevision, serialize } from '../save/migrate';
 import { localStorageAdapter, SAVE_KEY } from '../save/adapter';
 import { emitLocalSave } from '../save/bus';
 import { LEVEL_CAP } from '../engine/types';
@@ -49,7 +49,8 @@ interface GameStore {
   /** 引导跳转招募：点亮招待区面板（4s 后自动熄灭） */
   beginRecruitGuide: () => void;
   clearRecruitHighlight: () => void;
-  saveNow: () => void;
+  /** syncedRev 用于下载/上传成功后把本地版本对齐到云端 rev */
+  saveNow: (syncedRev?: number) => void;
   exportSaveString: () => string;
   importSaveString: (raw: string) => ActionResult;
   hardReset: () => void;
@@ -383,11 +384,16 @@ export const useGameStore = create<GameStore>()((set, get) => ({
 
   clearRecruitHighlight: () => set({ recruitHighlight: false }),
 
-  saveNow: () => {
+  saveNow: (syncedRev) => {
     const s = get().state;
     s.meta.lastSavedAt = Date.now();
     try {
-      const raw = serialize(s);
+      const prev = readSaveRevision(localStorageAdapter.load());
+      const revision =
+        syncedRev !== undefined
+          ? { rev: syncedRev, baseRev: syncedRev }
+          : { rev: (prev?.rev ?? 0) + 1, baseRev: prev?.baseRev ?? 0 };
+      const raw = serialize(s, revision);
       localStorageAdapter.save(raw);
       // 广播给云同步层（未接入时无订阅者，零开销）
       emitLocalSave(raw);
@@ -396,7 +402,10 @@ export const useGameStore = create<GameStore>()((set, get) => ({
     }
   },
 
-  exportSaveString: () => serialize(get().state),
+  exportSaveString: () => {
+    const revision = readSaveRevision(localStorageAdapter.load()) ?? { rev: 0, baseRev: 0 };
+    return serialize(get().state, revision);
+  },
 
   importSaveString: (raw) => {
     const state = deserialize(raw);

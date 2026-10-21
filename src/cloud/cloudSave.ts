@@ -25,6 +25,7 @@ export async function readCloud(db: Database, uid: string): Promise<CloudRecord 
   return {
     json: value.json,
     rev: value.rev,
+    baseRev: typeof value.baseRev === 'number' ? value.baseRev : -1,
     savedAt: typeof value.savedAt === 'number' ? value.savedAt : 0,
     deviceId: typeof value.deviceId === 'string' ? value.deviceId : '',
     updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : 0,
@@ -55,9 +56,10 @@ export async function pushCloud(
   const savedAt = extractSavedAt(raw);
   if (savedAt === null) return { kind: 'invalid-local' };
 
-  const buildRecord = (rev: number): CloudRecord => ({
+  const buildRecord = (rev: number, baseRev: number): CloudRecord => ({
     json: raw,
     rev,
+    baseRev,
     savedAt,
     deviceId: getDeviceId(),
     updatedAt: Date.now(),
@@ -66,8 +68,9 @@ export async function pushCloud(
   // 强制覆盖：先读当前 rev 再写，保证 rev 依旧单调
   if (options.force) {
     const current = await readCloud(db, uid);
-    const rev = (current?.rev ?? 0) + 1;
-    await set(ref(db, cloudSavePath(uid)), buildRecord(rev));
+    const currentRev = current?.rev ?? 0;
+    const rev = currentRev + 1;
+    await set(ref(db, cloudSavePath(uid)), buildRecord(rev, currentRev));
     return { kind: 'ok', rev };
   }
 
@@ -81,7 +84,7 @@ export async function pushCloud(
       guardFailed = true;
       return undefined; // 中止事务：保留远端内容
     }
-    return buildRecord(currentRev + 1);
+    return buildRecord(currentRev + 1, currentRev);
   });
 
   if (guardFailed || !result.committed) return { kind: 'conflict' };
