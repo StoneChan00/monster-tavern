@@ -3,7 +3,11 @@ dist/
 coverage/
 *.local
 .DS_Store
+
+# agents
 .omo/
+.worktrees/
+.pi/
 
 # 本地环境变量（Firebase 云同步配置），只入库 .env.example
 .env
