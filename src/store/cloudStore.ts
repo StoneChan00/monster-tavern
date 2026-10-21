@@ -254,6 +254,31 @@ function flush(): void {
   void pushNow(false);
 }
 
+/** 把 Firebase 认证错误翻译成可执行的中文提示（原始错误已 console.error 保留） */
+function describeAuthError(err: unknown): string {
+  const code =
+    typeof err === 'object' && err !== null && 'code' in err ? String((err as { code: unknown }).code) : '';
+  const host = typeof location !== 'undefined' ? location.hostname : '当前域名';
+  switch (code) {
+    case 'auth/popup-closed-by-user':
+      return '登录已取消';
+    case 'auth/cancelled-popup-request':
+      return '登录被打断，请重试';
+    case 'auth/popup-blocked':
+      return '浏览器拦截了登录弹窗，请允许弹窗后重试';
+    case 'auth/unauthorized-domain':
+      return `域名 ${host} 未获授权：需在 Firebase「身份验证 → 设置 → 授权域名」添加`;
+    case 'auth/network-request-failed':
+      return '连不上 Google 登录服务（需要代理），云同步暂不可用';
+    case 'auth/operation-not-supported-in-this-environment':
+      return '当前环境不支持弹窗登录，请改用 https 地址或其他浏览器';
+    case 'auth/internal-error':
+      return '登录服务内部错误，稍后重试（不影响单机游玩）';
+    default:
+      return code ? `登录失败（${code}），不影响单机游玩` : '登录失败，不影响单机游玩';
+  }
+}
+
 export const useCloudStore = create<CloudStore>((set, get) => ({
   status: CLOUD_CONFIGURED ? 'signed-out' : 'disabled',
   user: null,
@@ -310,11 +335,9 @@ export const useCloudStore = create<CloudStore>((set, get) => ({
       await modules.authApi.signInWithPopup(modules.auth, provider);
       // 登录成功后由 onAuthStateChanged → resolveInitial 接管
     } catch (err) {
-      const code = err instanceof Error ? err.message : String(err);
-      set({
-        status: 'error',
-        message: code.includes('popup-closed-by-user') ? '登录已取消' : '登录失败，请稍后重试（不影响单机游玩）',
-      });
+      // 原始错误留在控制台，便于排查；顶栏只显示可执行的中文提示
+      console.error('[cloud] signIn failed:', err);
+      set({ status: 'error', message: describeAuthError(err) });
     }
   },
 
