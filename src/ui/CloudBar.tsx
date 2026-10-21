@@ -76,6 +76,11 @@ export function CloudBar() {
       >
         {statusText(status, lastSyncAt)}
       </span>
+      {message && (status === 'error' || status === 'conflict') ? (
+        <span className="max-w-[280px] truncate text-[10px] text-[#c0392b]" title={message}>
+          {message}
+        </span>
+      ) : null}
       <button
         type="button"
         className="pixel-btn"

@@ -163,8 +163,9 @@ async function pushNow(force: boolean): Promise<void> {
       status: 'error',
       message: result.kind === 'too-large' ? '本地存档过大，已跳过云同步' : '本地存档格式异常，已跳过云同步',
     });
-  } catch {
-    useCloudStore.setState({ status: 'error', message: '上传失败：网络或权限问题，进度仍在本地' });
+  } catch (err) {
+    console.error('[cloud] push failed:', err);
+    useCloudStore.setState({ status: 'error', message: describeSyncError(err, '上传') });
   } finally {
     pushing = false;
   }
@@ -195,8 +196,9 @@ async function pullNow(): Promise<void> {
     }
     recordSync(user.uid, remote.rev, extractSavedAt(localRaw()));
     useCloudStore.setState({ status: 'synced', lastSyncAt: Date.now(), conflict: null, message: '已载入云端存档' });
-  } catch {
-    useCloudStore.setState({ status: 'error', message: '下载失败：网络或权限问题，进度仍在本地' });
+  } catch (err) {
+    console.error('[cloud] pull failed:', err);
+    useCloudStore.setState({ status: 'error', message: describeSyncError(err, '下载') });
   }
 }
 
@@ -243,8 +245,9 @@ async function resolveInitial(user: CloudUser): Promise<void> {
         remoteRev: remote?.rev ?? 0,
       },
     });
-  } catch {
-    useCloudStore.setState({ status: 'error', message: '同步失败：网络或权限问题，进度仍在本地' });
+  } catch (err) {
+    console.error('[cloud] resolveInitial failed:', err);
+    useCloudStore.setState({ status: 'error', message: describeSyncError(err, '同步') });
   }
 }
 
@@ -254,10 +257,15 @@ function flush(): void {
   void pushNow(false);
 }
 
+/** 取错误的机器码：Firebase 通常放在 err.code，兜底用 message */
+function errorCode(err: unknown): string {
+  if (typeof err === 'object' && err !== null && 'code' in err) return String((err as { code: unknown }).code);
+  return err instanceof Error ? err.message : String(err);
+}
+
 /** 把 Firebase 认证错误翻译成可执行的中文提示（原始错误已 console.error 保留） */
 function describeAuthError(err: unknown): string {
-  const code =
-    typeof err === 'object' && err !== null && 'code' in err ? String((err as { code: unknown }).code) : '';
+  const code = errorCode(err);
   const host = typeof location !== 'undefined' ? location.hostname : '当前域名';
   switch (code) {
     case 'auth/popup-closed-by-user':
@@ -277,6 +285,21 @@ function describeAuthError(err: unknown): string {
     default:
       return code ? `登录失败（${code}），不影响单机游玩` : '登录失败，不影响单机游玩';
   }
+}
+
+/** 把云端读写错误翻译成可执行的中文提示（原始错误已 console.error 保留） */
+function describeSyncError(err: unknown, action: string): string {
+  const code = errorCode(err);
+  if (/permission_denied/i.test(code)) {
+    return '云端读写被拒绝：Realtime Database 规则未发布或与代码不匹配（见 docs/cloud-save.md 第 4 节）';
+  }
+  if (/unavailable|network|disconnect|timeout|offline/i.test(code)) {
+    return `${action}失败：连不上云端（网络），进度仍在本地`;
+  }
+  if (/invalid_token|token_expired|unauthorized|auth\//i.test(code)) {
+    return '登录态已失效，请重新登录后再同步';
+  }
+  return code ? `${action}失败（${code.slice(0, 60)}），进度仍在本地` : `${action}失败，进度仍在本地`;
 }
 
 export const useCloudStore = create<CloudStore>((set, get) => ({
